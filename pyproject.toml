@@ -1,0 +1,35 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "ate"
+version = "0.1.0"
+description = "Agente de Transparencia Electoral (ATE) - Colombia 2026. Sprint 1: grafo base + planificador."
+readme = "README.md"
+requires-python = ">=3.11"
+authors = [{ name = "Mateo Giraldo" }]
+dependencies = [
+    "langgraph>=0.2,<1.0",
+    "langchain-core>=0.3,<1.0",
+    "pydantic>=2.6,<3",
+    "python-dotenv>=1.0,<2",
+]
+
+[project.optional-dependencies]
+llm-anthropic = ["langchain-anthropic>=0.2,<1.0"]
+dev = [
+    "pytest>=8,<9",
+    "langchain-anthropic>=0.2,<1.0",
+]
+
+[project.scripts]
+ate = "ate.cli:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/ate"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+pythonpath = ["src"]
