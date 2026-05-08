@@ -23,3 +23,7 @@ env/
 .claude/
 claude.md
 CLAUDE.md
+
+# Sprint 3: base vectorial persistente (Chroma + onnx model)
+data/
+*.sqlite3

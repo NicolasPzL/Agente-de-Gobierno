@@ -1,19 +1,23 @@
-"""Tests del registro de tools y del esquema estable de sus stubs."""
+"""Tests del registro de tools y del esquema estable de sus salidas.
+
+Sprint 2: las tools devuelven `ResultadoExtraccion` (no dict). Como la
+suite corre en modo offline (`ATE_OFFLINE=1` desde conftest), las tools
+que tocan la red devuelven `estado="offline"` aqui — eso valida la red
+de seguridad y mantiene los tests deterministas. Los tests con HTTP
+mockeado viven en `test_tools_apis.py`.
+"""
 
 from __future__ import annotations
 
 import pytest
 
-from ate.schemas.state import Intencion
+from ate.schemas.state import Intencion, ResultadoExtraccion
 from ate.tools import listar, obtener, tools_para
 
 
-_CAMPOS_RESPUESTA = ("fuente", "estado", "consulta", "resultados", "mensaje")
-
-
 def test_hay_al_menos_cinco_tools_registradas():
-    # Sprint 1 define exactamente 5 stubs (datos_abiertos, secop, cne,
-    # rag_planes, busqueda_noticias). Ese numero puede crecer, nunca bajar.
+    # Sprint 1 definio 5 tools (datos_abiertos, secop, cne, rag_planes,
+    # busqueda_noticias). Ese numero puede crecer, nunca bajar.
     assert len(listar()) >= 5
 
 
@@ -27,14 +31,29 @@ def test_hay_al_menos_cinco_tools_registradas():
         "buscar_noticias",
     ],
 )
-def test_cada_tool_stub_respeta_esquema(nombre):
+def test_cada_tool_devuelve_resultado_extraccion(nombre):
+    """En offline, todas las tools devuelven `ResultadoExtraccion` valido.
+
+    El estado puede ser `offline`, `no_configurado` o `sin_datos` segun
+    la tool — pero nunca `ok`, porque eso requeriria red.
+    """
     spec = obtener(nombre)
     respuesta = spec.ejecutar("candidato de prueba")
-    for campo in _CAMPOS_RESPUESTA:
-        assert campo in respuesta, f"falta campo '{campo}' en {nombre}"
-    assert respuesta["estado"] == "stub"
-    assert isinstance(respuesta["resultados"], list)
-    assert respuesta["consulta"] == "candidato de prueba"
+
+    assert isinstance(respuesta, ResultadoExtraccion)
+    assert respuesta.tool == nombre
+    assert respuesta.consulta == "candidato de prueba"
+    # Sin red, ningun call debe reportar 'ok'.
+    assert respuesta.estado != "ok"
+    # Cualquier estado valido del enum.
+    assert respuesta.estado in {
+        "offline",
+        "no_configurado",
+        "sin_datos",
+        "error_red",
+        "error_http",
+        "error_parseo",
+    }
 
 
 @pytest.mark.parametrize(
@@ -61,7 +80,19 @@ def test_obtener_tool_inexistente_lanza_keyerror():
 
 
 def test_sprint_real_declarado_es_razonable():
-    # Cada tool declara en que sprint deja de ser stub. Sprint 1 no
-    # deberia contener tools "reales"; todas apuntan a >= 2.
+    # En Sprint 2 las tools reales de extraccion ya son sprint_real=2.
+    # La de RAG sigue en sprint_real=3.
     for spec in listar():
-        assert spec.sprint_real >= 2, f"{spec.nombre} deberia esperar al Sprint 2 o posterior"
+        assert spec.sprint_real >= 2, f"{spec.nombre} debe ser sprint_real >= 2"
+
+
+def test_resultado_extraccion_tiene_urls_oficiales_o_estado_explicito():
+    """Refuerza el principio de trazabilidad.
+
+    Toda respuesta `ok` debe tener al menos una URL oficial (para
+    citacion del Sprint 5). En estados no-ok puede no haberla.
+    """
+    for spec in listar():
+        r = spec.ejecutar("petro")
+        if r.estado == "ok":
+            assert r.urls_oficiales, f"{spec.nombre}: ok sin urls_oficiales"

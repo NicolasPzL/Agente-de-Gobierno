@@ -1,7 +1,8 @@
-# Guia paso a paso - ejecutar y probar el Sprint 1
+# Guia paso a paso - ejecutar y probar Sprints 1, 2, 2.5 y 3
 
-Esta guia te lleva desde cero hasta ejecutar los tests y la demo del
-planificador. Solo cubre lo que ya esta implementado en Sprint 1.
+Esta guia te lleva desde cero hasta correr los tests, la demo CLI
+offline y la demo CLI con APIs reales (datos.gov.co / SECOP). Cubre
+todo lo que ya esta implementado.
 
 ## 0. Requisitos previos
 
@@ -9,11 +10,11 @@ planificador. Solo cubre lo que ya esta implementado en Sprint 1.
   ```powershell
   python --version
   ```
-- **Git** (para clonar si aun no lo hiciste) y una terminal:
-  **PowerShell** o **Git Bash** en Windows; **bash/zsh** en Linux/macOS.
+- **Git** y una terminal: PowerShell o Git Bash en Windows; bash/zsh
+  en Linux/macOS.
 
-No necesitas API keys ni conexion a internet para correr los tests ni
-la demo: el camino por defecto del planificador es determinista.
+No necesitas API keys ni red para correr los tests: la suite fuerza
+modo offline + clasificador determinista.
 
 ---
 
@@ -23,7 +24,7 @@ la demo: el camino por defecto del planificador es determinista.
 cd C:\girald0\estudio\pregrado\09\agentes\agenteGobierno
 ```
 
-Verifica que estas en la carpeta correcta:
+Verifica:
 
 ```powershell
 ls
@@ -40,8 +41,6 @@ Deberias ver `pyproject.toml`, `src/`, `tests/`, `docs/`, `README.md`,
 python -m venv .venv
 ```
 
-Esto crea la carpeta `.venv/` (ya esta en `.gitignore`).
-
 ### 2.1 Activar el venv
 
 **PowerShell** (Windows):
@@ -51,7 +50,7 @@ Esto crea la carpeta `.venv/` (ya esta en `.gitignore`).
 ```
 
 > Si PowerShell rechaza el script por politica de ejecucion, corre una
-> sola vez (como tu usuario):
+> sola vez:
 > ```powershell
 > Set-ExecutionPolicy -Scope CurrentUser -ExecutionPolicy RemoteSigned
 > ```
@@ -68,11 +67,9 @@ source .venv/Scripts/activate
 source .venv/bin/activate
 ```
 
-El prompt deberia quedar con `(.venv)` al principio.
-
 ---
 
-## 3. Instalar el paquete en modo editable con dependencias de desarrollo
+## 3. Instalar el paquete en modo editable
 
 ```powershell
 pip install --upgrade pip
@@ -81,12 +78,12 @@ pip install -e ".[dev]"
 
 Esto instala:
 
-- `langgraph`, `langchain-core`, `pydantic`, `python-dotenv` (runtime).
+- `langgraph`, `langchain-core`, `pydantic`, `python-dotenv`, `requests`
+  (runtime).
 - `pytest` y `langchain-anthropic` (extras `dev`).
-- El paquete `ate` en modo editable (puedes modificar `src/ate/` sin
-  reinstalar).
+- El paquete `ate` editable.
 
-Al terminar, verifica que el comando esta disponible:
+Verifica:
 
 ```powershell
 python -m ate --help
@@ -100,118 +97,146 @@ python -m ate --help
 pytest
 ```
 
-Salida esperada (41 casos, en menos de 1 segundo):
+Salida esperada (79 casos, ~3 segundos):
 
 ```
-============================= test session starts =============================
-collected 41 items
+tests\test_extraccion.py ...........                           [13%]
+tests\test_graph.py .......                                     [22%]
+tests\test_planificador.py ....................                 [47%]
+tests\test_tools.py .............                               [63%]
+tests\test_tools_apis.py ............................          [100%]
 
-tests\test_graph.py .......                                              [ 17%]
-tests\test_planificador.py ....................                          [ 65%]
-tests\test_tools.py ..............                                       [100%]
-
-============================= 41 passed in 0.6s ==============================
+============================ 79 passed in 3.07s ============================
 ```
 
-### 4.1 Ejecutar un archivo o test individual
+### 4.1 Ejecutar archivos / tests individuales
 
 ```powershell
 pytest tests/test_planificador.py
-pytest tests/test_graph.py::test_grafo_produce_plan_para_contratacion
-pytest -k secop                 # solo tests que contengan "secop"
-pytest -v                       # verbose: imprime el nombre de cada test
+pytest tests/test_extraccion.py
+pytest tests/test_tools_apis.py -k secop
+pytest -v                       # verbose
 ```
 
 ---
 
-## 5. Probar la demo CLI
+## 5. Demo CLI offline (sin red ni API keys)
 
-El entrypoint recibe una pregunta entre comillas y emite el plan
-(intencion + tools + razonamiento) en JSON.
-
-### 5.1 Casos por categoria de intencion
-
-```powershell
-python -m ate "¿Que contratos tiene el candidato X en SECOP?"
-python -m ate "Donantes y aportes en Cuentas Claras"
-python -m ate "Sanciones disciplinarias del candidato"
-python -m ate "¿Que propone en educacion?"
-python -m ate "Ultima entrevista del candidato"
-python -m ate "Hola, como estas?"
-```
-
-Cada una deberia devolver una `intencion` distinta
-(`contratacion`, `financiacion`, `datos_oficiales`, `plan_gobierno`,
-`noticias`, `indefinida`) y la tool correspondiente (o lista vacia
-para `indefinida`).
-
-Ejemplo de salida:
-
-```json
-{
-  "pregunta": "¿Que contratos tiene el candidato X en SECOP?",
-  "plan": {
-    "intencion": "contratacion",
-    "tools": ["consultar_secop"],
-    "razonamiento": "Palabra clave detectada: 'secop'."
-  }
-}
-```
-
-### 5.2 Ver logs internos
+Por defecto, si pones `ATE_OFFLINE=1` en `.env`, las tools no tocan la
+red y devuelven `estado: "offline"` con la URL canonica conservada
+para trazabilidad.
 
 ```powershell
-python -m ate -v "Sanciones del candidato"
+$env:ATE_OFFLINE="1"
+python -m ate --resumen "¿Que contratos tiene el candidato en SECOP?"
+python -m ate --resumen "Donantes registrados en Cuentas Claras"
+python -m ate --resumen "Sanciones disciplinarias"
+python -m ate --resumen "¿Que propone en educacion?"
+python -m ate --resumen "Hola, como estas"
 ```
 
-Imprime ademas los logs `DEBUG` del planificador y del grafo.
+Cada llamada imprime `plan` + `contexto_extraido` con los estados
+correctos:
+
+- `offline` para las tools que necesitarian red.
+- `no_configurado` para CNE (sin dataset configurado) y RAG (Sprint 3).
+- Sin tools y contexto vacio para `intencion=indefinida`.
 
 ---
 
-## 6. (Opcional) Activar el camino LLM estructurado
+## 6. Demo CLI online (datos.gov.co, SECOP)
+
+```powershell
+$env:ATE_OFFLINE="0"
+python -m ate --resumen "Que contratos tiene Petro en SECOP"
+```
+
+Salida esperada: estado `ok` con ~50 contratos reales (25 SECOP I + 25
+SECOP II) y URLs canonicas a `https://www.datos.gov.co/d/...`.
+
+```powershell
+python -m ate "Antecedentes disciplinarios de Hernandez"
+```
+
+(Sin `--resumen` se imprimen los registros crudos completos.)
+
+> **Nota:** las APIs Socrata son publicas. Para subir el rate limit
+> (de ~1 req/s a 1000 req/h), obtener un `SOCRATA_APP_TOKEN` gratis en
+> https://www.datos.gov.co/profile/edit/developer_settings y ponerlo
+> en `.env`.
+
+---
+
+## 7. Activar tools opcionales
+
+### 7.1 CNE Cuentas Claras
+
+Cuentas Claras no tiene API publica estable. Hay dos formas:
+
+```ini
+# .env - opcion A: dataset Socrata si existe para 2026
+ATE_CNE_DATASET=<id_socrata>
+
+# .env - opcion B: descargar y filtrar un CSV oficial
+ATE_CNE_CSV_URL=https://www.cuentasclarasenelectoral.gov.co/path/al.csv
+```
+
+Sin nada de esto, la tool devuelve `estado: "no_configurado"` con un
+mensaje claro (no inventa datos).
+
+### 7.2 Buscador de noticias
+
+```ini
+# .env - opcion A: Tavily (recomendado, 1000 req/mes gratis)
+ATE_NEWS_PROVIDER=tavily
+TAVILY_API_KEY=tvly-...
+
+# .env - opcion B: Serper (Google News)
+ATE_NEWS_PROVIDER=serper
+SERPER_API_KEY=...
+```
+
+Get keys:
+- Tavily: https://app.tavily.com (gratis con email)
+- Serper: https://serper.dev (gratis con email)
+
+```powershell
+python -m ate --resumen "Ultima entrevista de Petro"
+```
+
+---
+
+## 8. Activar el camino LLM del planificador
 
 Por defecto el planificador clasifica por palabras clave. Si quieres
-probar el clasificador con un LLM real (Claude via Anthropic):
+probar con un LLM real (Claude via Anthropic):
 
-### 6.1 Copiar la plantilla de entorno
-
-```powershell
-# PowerShell
-Copy-Item .env.example .env
-```
-
-```bash
-# Git Bash / Linux / macOS
-cp .env.example .env
-```
-
-### 6.2 Editar `.env`
-
-Abre `.env` en un editor y ajusta:
-
-```
+```ini
+# .env
 ATE_LLM_PROVIDER=anthropic
 ANTHROPIC_API_KEY=tu_api_key_aqui
-# ATE_ANTHROPIC_MODEL=claude-sonnet-4-6   # opcional
+ATE_ANTHROPIC_MODEL=claude-sonnet-4-6
 ```
 
-### 6.3 Volver a ejecutar la demo
+Tambien soporta Ollama local:
 
-```powershell
-python -m ate "¿Como financia su campana?"
+```ini
+ATE_LLM_PROVIDER=ollama
+OLLAMA_HOST=http://127.0.0.1:11434
+OLLAMA_MODEL=qwen3-vl:8b
 ```
 
-El campo `razonamiento` ahora vendra del LLM. Si el LLM falla (red caida,
-key invalida), el planificador **cae** al clasificador por palabras
-clave y lo deja marcado en `razonamiento` con un aviso del tipo
-`(LLM no disponible: ...)`.
+Si el LLM falla (red, key invalida, modelo no descargado), el
+planificador **cae** al clasificador por palabras clave y lo deja
+marcado en `razonamiento` con `(LLM no disponible: ...)`.
 
-> **Nota:** los tests (`pytest`) **siempre** fuerzan el camino
-> determinista aunque tengas `.env` configurado — ningun test toca red.
+> **Importante:** los tests siempre fuerzan `ATE_LLM_PROVIDER=none` y
+> `ATE_OFFLINE=1` aunque tengas `.env` configurado — ningun test toca
+> red ni gasta tokens.
 
 ---
 
-## 7. Desactivar el venv al terminar
+## 9. Desactivar el venv al terminar
 
 ```powershell
 deactivate
@@ -219,24 +244,66 @@ deactivate
 
 ---
 
-## 8. Problemas comunes
+## 10. Problemas comunes
 
 | Sintoma | Causa probable | Solucion |
 | :-- | :-- | :-- |
-| `ModuleNotFoundError: ate` | Instalacion no editable, o venv no activado | Activa `.venv` y corre `pip install -e ".[dev]"` de nuevo |
+| `ModuleNotFoundError: ate` | Instalacion no editable, o venv no activado | `pip install -e ".[dev]"` con venv activo |
 | `pytest` no se encuentra | Extras `dev` no instalados | `pip install -e ".[dev]"` |
-| JSON de la CLI muestra `?` o `�` en acentos | Codepage de la consola (Windows) | Es solo visual; los datos son correctos. Puedes ejecutar `chcp 65001` en PowerShell para UTF-8 |
-| `ATE_LLM_PROVIDER invalido` | Valor no soportado en `.env` | Usa uno de: `anthropic`, `openai`, `ollama`, `none` |
-| `ANTHROPIC_API_KEY no configurada` | `.env` sin key pero provider=anthropic | Rellena la key o pon `ATE_LLM_PROVIDER=none` |
+| JSON con `?` o `�` en acentos (Windows) | Codepage de la consola | `chcp 65001` para UTF-8 |
+| `ATE_LLM_PROVIDER invalido` | Valor no soportado en `.env` | `anthropic`, `openai`, `ollama` o `none` |
+| `ANTHROPIC_API_KEY no configurada` | Provider=anthropic sin key | Rellenar key o cambiar provider |
+| Tool devuelve `estado: "no_configurado"` | Falta env var de la fuente | Ver `.env.example` para la variable que pide |
+| Tool devuelve `estado: "error_http"` | Dataset Socrata renombrado o caido | Ajustar `ATE_*_DATASET` o reintentar |
+| Tool devuelve `estado: "offline"` con red disponible | `ATE_OFFLINE=1` activo | `$env:ATE_OFFLINE="0"` o ajustar `.env` |
 
 ---
 
-## 9. Que viene despues
+## 11. Sprint 3 - RAG sobre planes de gobierno
 
-Sprints 2–5 (ver `sprintRecomendaciones.md` y `docs/arquitectura_sprint1.md`):
+Sprint 3 agrega busqueda semantica sobre los PDFs en
+`public/Candidatos/`. Tienes que ingerirlos una sola vez:
 
-- **Sprint 2:** reemplazar stubs de `datos_abiertos`, `secop`, `cne`,
-  `buscar_noticias` por clientes reales.
-- **Sprint 3:** ingesta de PDFs + base vectorial + agente RAG.
-- **Sprint 4:** agentes de contraste y validador.
-- **Sprint 5:** agente generador + interfaz + demo end-to-end.
+```powershell
+python scripts/ingestar_planes.py
+```
+
+Salida esperada (~50 segundos la primera vez por la descarga del modelo
+ONNX, despues ~5s):
+
+```
+CANDIDATO                                CHUNKS
+ivan-cepeda                              13
+claudia-lopez                            7
+abelardo-de-la-espriella                 13
+paloma-valencia                          10
+sergio-fajardo                           5
+... (13 candidatos en total)
+Total en coleccion: 78 chunks.
+```
+
+### 11.1 Demo del agente RAG con candidato detectado
+
+```powershell
+$env:ATE_OFFLINE="0"
+python -m ate --resumen "¿Que propone Ivan Cepeda sobre derechos humanos?"
+python -m ate --resumen "Plan de gobierno de Sergio Fajardo en educacion"
+python -m ate --resumen "¿Que dice Paloma Valencia sobre seguridad?"
+```
+
+Cada llamada imprime `plan` (con `candidato.id` detectado),
+`contexto_extraido` (tools de SECOP/datos.gov.co/CNE) y `contexto_rag`
+con los pasajes recuperados (PDF, pagina, score).
+
+### 11.2 Reingestar un solo candidato
+
+```powershell
+python scripts/ingestar_planes.py --solo paloma-valencia --reset
+```
+
+### 11.3 Que viene despues
+
+- **Sprint 4:** agentes de contraste y validador, + ciclo
+  `validador -> extraccion`.
+- **Sprint 5:** agente generador con citacion + interfaz +
+  demo end-to-end.

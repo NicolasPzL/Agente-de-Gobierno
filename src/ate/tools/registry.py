@@ -1,4 +1,4 @@
-"""Registro central de tools disponibles para el planificador.
+"""Registro central de tools disponibles para el planificador y el extractor.
 
 Cada tool se registra una sola vez al importar su modulo. El registro
 mantiene, ademas del callable, metadatos que el planificador usa para
@@ -10,9 +10,13 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Callable, Dict, List, Tuple
 
-from ate.schemas.state import Intencion
+from ate.schemas.state import Intencion, ResultadoExtraccion
 
-ToolCallable = Callable[[str], dict]
+# Las tools aceptan un `consulta: str` y, opcionalmente,
+# `settings: Settings | None` por keyword. El extractor del Sprint 2
+# inyecta settings; tests directos pueden invocar sin settings y la
+# tool cargara desde entorno.
+ToolCallable = Callable[..., ResultadoExtraccion]
 
 
 @dataclass(frozen=True)
@@ -23,9 +27,8 @@ class ToolSpec:
         nombre: identificador unico, usado por el planificador.
         descripcion: breve descripcion funcional (en espanol).
         intenciones: intenciones para las que esta tool es candidata.
-        ejecutar: callable con firma `(consulta: str) -> dict`.
-        sprint_real: sprint en el que este stub sera reemplazado por
-            una implementacion real.
+        ejecutar: callable con firma `(consulta: str, *, settings=None) -> ResultadoExtraccion`.
+        sprint_real: sprint en el que la tool deja de ser stub.
     """
 
     nombre: str

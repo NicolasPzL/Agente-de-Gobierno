@@ -23,6 +23,7 @@ import urllib.error
 import urllib.request
 from typing import Tuple
 
+from ate.candidatos import detectar_candidato
 from ate.config.settings import Settings, load_settings
 from ate.schemas.state import EstadoGrafo, Intencion, PlanEjecucion
 from ate.tools import tools_para
@@ -320,12 +321,16 @@ def _invocar_llm_ollama(pregunta: str, settings: Settings) -> Tuple[Intencion, s
 def planificar(pregunta: str, settings: Settings | None = None) -> PlanEjecucion:
     """Genera el plan de ejecucion para una pregunta.
 
+    Sprint 2.5: ademas de clasificar la intencion, detecta el candidato
+    mencionado (si lo hay) para que el extractor pueda reescribir la
+    consulta por tool.
+
     Args:
         pregunta: texto del usuario.
         settings: configuracion a usar. Si es `None` se carga desde entorno.
 
     Returns:
-        `PlanEjecucion` con intencion, tools a invocar y razonamiento.
+        `PlanEjecucion` con intencion, tools, razonamiento y candidato.
     """
     if not pregunta or not pregunta.strip():
         return PlanEjecucion(
@@ -341,10 +346,21 @@ def planificar(pregunta: str, settings: Settings | None = None) -> PlanEjecucion
     else:
         intencion, razon = clasificar_por_palabras(pregunta)
 
+    # Deteccion deterministica del candidato (no toca red).
+    candidato = detectar_candidato(pregunta)
+    if candidato is not None:
+        razon = f"{razon} Candidato detectado: {candidato.nombre_corto} ({candidato.partido})."
+
+    # Si la pregunta menciona un candidato pero la intencion quedo
+    # `indefinida`, dejamos `indefinida` (el usuario quizas pregunto
+    # algo que no encaja en las categorias). El validador del Sprint 4
+    # decidira que hacer.
+
     return PlanEjecucion(
         intencion=intencion,
         tools=tools_para(intencion),
-        razonamiento=razon,
+        razonamiento=razon.strip(),
+        candidato=candidato,
     )
 
 

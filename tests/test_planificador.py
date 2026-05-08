@@ -1,4 +1,4 @@
-"""Tests del agente planificador (camino determinista)."""
+"""Tests del agente planificador (camino determinista y Ollama mockeado)."""
 
 from __future__ import annotations
 
@@ -14,21 +14,23 @@ from ate.agents.planificador import (
     clasificar_por_palabras,
     planificar,
 )
-from ate.config.settings import Settings
+from ate.config.settings import Settings, load_settings
 from ate.schemas.state import Intencion
 
 
 def _settings_sin_llm() -> Settings:
-    """Settings que fuerza el camino determinista (no toca red)."""
-    return Settings(
+    """Settings que fuerza el camino determinista (no toca red).
+
+    Se construye sobre `load_settings()` para heredar todos los campos
+    nuevos del Sprint 2 (Socrata, news_provider, etc.) sin tener que
+    repetirlos aqui — solo se sobreescribe lo que el test necesita.
+    """
+    return replace(
+        load_settings(),
         llm_provider="none",
         anthropic_api_key=None,
-        anthropic_model="claude-sonnet-4-6",
         openai_api_key=None,
-        openai_model="gpt-4o",
-        ollama_host="http://127.0.0.1:11434",
         ollama_model="llama3.2:3b",
-        ollama_timeout=60.0,
     )
 
 
