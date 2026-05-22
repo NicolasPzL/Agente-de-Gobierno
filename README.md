@@ -1,4 +1,10 @@
 # Agente de Gobierno
+## Integrantes:
+- Emanuel Zuluaga Restrepo
+- Julian Cañas Saldarriaga
+- Mateo Giraldo Soto
+- Nicolas Paez Lancheros
+
 # 🗳️ Agente de Transparencia Electoral (ATE) - Colombia 2026
 
 El **ATE** es un agente de Inteligencia Artificial de vanguardia diseñado para auditar y centralizar información sobre los candidatos presidenciales en Colombia. Utiliza tecnologías de **Agentes Autónomos** y **RAG** para conectar planes de gobierno con datos reales de contratación y antecedentes, combatiendo la desinformación mediante la transparencia radical.
