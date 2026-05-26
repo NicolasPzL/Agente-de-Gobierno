@@ -6,14 +6,16 @@ agente de extraccion.
 Sprint 2.5: el plan ahora puede llevar un `Candidato` detectado para
 afinar las consultas en cada tool.
 Sprint 3: agrega `PasajeRag` y `ContextoRag` para el agente RAG.
-Los campos se consumen por el agente de contraste (Sprint 4) y el
-generador (Sprint 5) sin tocar la firma.
+Sprint 4: agrega `InconsistenciaPropuesta`, `ContextoContraste`,
+`ValidacionFuente` y `ContextoValidacion` para los agentes de contraste
+y validacion. Los campos se consumen por el generador (Sprint 5) sin
+tocar la firma.
 """
 
 from __future__ import annotations
 
 from enum import Enum
-from typing import List, Literal, Optional, TypedDict
+from typing import List, Literal, Optional, TypedDict, Union
 
 from pydantic import BaseModel, Field
 
@@ -163,6 +165,128 @@ class ContextoRag(BaseModel):
         return self.estado == "ok" and bool(self.pasajes)
 
 
+# ---------------------------------------------------------------------------
+# Sprint 4: Contraste y Validacion
+# ---------------------------------------------------------------------------
+
+TipoInconsistencia = Literal[
+    "propuesta_sin_contratos",   # el candidato propone pero SECOP no tiene contratos
+    "contratos_sin_propuesta",   # hay contratos en SECOP pero no hay propuesta en el plan
+    "sanciones_detectadas",      # la Procuraduria registra sanciones disciplinarias
+    "inconsistencia_sectorial",  # propuesta en sector X pero contratos en otros sectores
+]
+
+
+class InconsistenciaPropuesta(BaseModel):
+    """Una inconsistencia detectada entre propuesta y datos reales.
+
+    Solo se crea con evidencia directa de los datos. Nunca se infiere ni
+    se inventa. Si no hay datos suficientes, el ContextoContraste
+    declara estado='sin_datos' en lugar de crear inconsistencias vacias.
+    """
+
+    tipo: TipoInconsistencia
+    descripcion: str = Field(description="Descripcion legible de la inconsistencia.")
+    evidencia_propuesta: str = Field(
+        default="",
+        description="Fragmento del plan de gobierno que genera la inconsistencia.",
+    )
+    evidencia_dato: str = Field(
+        default="",
+        description="Dato real (contrato, sancion) que contrasta con la propuesta.",
+    )
+    fuentes: List[str] = Field(
+        default_factory=list,
+        description="Nombres de las fuentes donde se encontro la evidencia.",
+    )
+
+
+class ContextoContraste(BaseModel):
+    """Salida del agente de contraste (Sprint 4).
+
+    Cruza la informacion de propuestas del plan de gobierno (ContextoRag)
+    con los datos reales de las fuentes oficiales (ContextoExtraido).
+    Nunca inventa: si no hay datos declara estado='sin_datos'.
+    """
+
+    candidato_id: Optional[str] = Field(
+        default=None,
+        description="Slug del candidato analizado; None si no se detecto candidato.",
+    )
+    inconsistencias: List[InconsistenciaPropuesta] = Field(default_factory=list)
+    n_propuestas_analizadas: int = Field(
+        default=0,
+        description="Cantidad de pasajes RAG usados en el analisis.",
+    )
+    n_contratos_analizados: int = Field(
+        default=0,
+        description="Cantidad de contratos SECOP usados en el analisis.",
+    )
+    n_sanciones_analizadas: int = Field(
+        default=0,
+        description="Cantidad de registros de sanciones usados en el analisis.",
+    )
+    estado: Literal[
+        "ok",            # contraste ejecutado (puede haber 0 inconsistencias)
+        "sin_datos",     # no hay suficiente informacion para contrastar
+        "sin_candidato", # no se detecto candidato; el contraste no aplica
+        "error",
+    ] = "sin_datos"
+    mensaje: str = ""
+
+    @property
+    def hubo_inconsistencias(self) -> bool:
+        return bool(self.inconsistencias)
+
+
+class ValidacionFuente(BaseModel):
+    """Resultado de validar una URL individual.
+
+    En modo offline `accesible` es None porque no se hizo peticion HTTP.
+    En modo online es True/False segun el codigo HTTP retornado.
+    """
+
+    url: str
+    es_oficial: bool = Field(
+        description=(
+            "True si el dominio pertenece a la lista de fuentes oficiales "
+            "colombianas reconocidas (*.gov.co, datos.gov.co, etc.)."
+        ),
+    )
+    accesible: Optional[bool] = Field(
+        default=None,
+        description="True si HTTP HEAD retorno 2xx. None en modo offline.",
+    )
+    dominio_detectado: str = Field(
+        default="",
+        description="Dominio raiz extraido de la URL.",
+    )
+    observacion: str = Field(
+        default="",
+        description="Razon de aceptacion o rechazo de la fuente.",
+    )
+
+
+class ContextoValidacion(BaseModel):
+    """Salida del agente validador (Sprint 4).
+
+    Verifica que las URLs citadas por las tools de extraccion pertenezcan
+    a dominios oficiales colombianos y, en modo online, que sean accesibles.
+    """
+
+    fuentes_validadas: List[ValidacionFuente] = Field(default_factory=list)
+    total_fuentes: int = 0
+    fuentes_oficiales: int = 0
+    fuentes_no_oficiales: int = 0
+    fuentes_inaccesibles: int = 0
+    estado: Literal["ok", "sin_fuentes", "offline"] = "sin_fuentes"
+    mensaje: str = ""
+
+    @property
+    def todas_oficiales(self) -> bool:
+        return self.fuentes_no_oficiales == 0 and self.total_fuentes > 0
+
+
 class EstadoGrafo(TypedDict, total=False):
     """Estado compartido del grafo LangGraph.
 
@@ -175,8 +299,8 @@ class EstadoGrafo(TypedDict, total=False):
     plan: Optional[PlanEjecucion]
     contexto_extraido: Optional[ContextoExtraido]   # Sprint 2
     contexto_rag: Optional[ContextoRag]             # Sprint 3
+    contraste: Optional[ContextoContraste]          # Sprint 4
+    validacion: Optional[ContextoValidacion]        # Sprint 4
 
-    # --- Hooks para sprints futuros (no poblar todavia) ---
-    # contraste: dict              # Sprint 4: inconsistencias propuesta vs hechos
-    # validacion: dict             # Sprint 4: verificacion de URLs y fuentes
+    # --- Hook para sprint futuro (no poblar todavia) ---
     # respuesta_final: str         # Sprint 5: texto generado con citacion

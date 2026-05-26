@@ -7,6 +7,8 @@ Sprint 1: emitia solo el plan del planificador.
 Sprint 2: tambien emite el `contexto_extraido` con los resultados de
 las tools invocadas. Ambos campos viven bajo el JSON final, asi cualquier
 script externo puede pipear la salida (`python -m ate "..." | jq ...`).
+Sprint 4: tambien emite `contraste` (inconsistencias propuesta vs datos)
+y `validacion` (verificacion de dominios de fuentes oficiales).
 """
 
 from __future__ import annotations
@@ -116,6 +118,53 @@ def main(argv: Optional[List[str]] = None) -> int:
             }
         else:
             salida["contexto_rag"] = contexto_rag.model_dump(mode="json")
+
+    # --- Sprint 4: contraste ---
+    contraste = estado_final.get("contraste")
+    if contraste is not None and not args.solo_plan:
+        if args.resumen:
+            salida["contraste"] = {
+                "candidato_id": contraste.candidato_id,
+                "estado": contraste.estado,
+                "mensaje": contraste.mensaje,
+                "n_propuestas": contraste.n_propuestas_analizadas,
+                "n_contratos": contraste.n_contratos_analizados,
+                "n_sanciones": contraste.n_sanciones_analizadas,
+                "inconsistencias": [
+                    {
+                        "tipo": i.tipo,
+                        "descripcion": i.descripcion,
+                        "fuentes": i.fuentes,
+                    }
+                    for i in contraste.inconsistencias
+                ],
+            }
+        else:
+            salida["contraste"] = contraste.model_dump(mode="json")
+
+    # --- Sprint 4: validacion ---
+    validacion = estado_final.get("validacion")
+    if validacion is not None and not args.solo_plan:
+        if args.resumen:
+            salida["validacion"] = {
+                "estado": validacion.estado,
+                "mensaje": validacion.mensaje,
+                "total_fuentes": validacion.total_fuentes,
+                "fuentes_oficiales": validacion.fuentes_oficiales,
+                "fuentes_no_oficiales": validacion.fuentes_no_oficiales,
+                "fuentes_inaccesibles": validacion.fuentes_inaccesibles,
+                "fuentes": [
+                    {
+                        "url": f.url,
+                        "es_oficial": f.es_oficial,
+                        "accesible": f.accesible,
+                        "dominio": f.dominio_detectado,
+                    }
+                    for f in validacion.fuentes_validadas
+                ],
+            }
+        else:
+            salida["validacion"] = validacion.model_dump(mode="json")
 
     print(json.dumps(salida, ensure_ascii=False, indent=2))
     return 0
