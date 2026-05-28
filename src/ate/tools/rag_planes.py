@@ -103,6 +103,16 @@ def buscar_plan_gobierno(
         candidato_id=candidato.id if candidato else None,
     )
 
+    if not hits and candidato:
+        global_hits = cliente.buscar(consulta, k=cfg.rag_top_k)
+        if global_hits:
+            hits = global_hits
+            fallback_global = True
+        else:
+            fallback_global = False
+    else:
+        fallback_global = False
+
     if not hits:
         return ResultadoExtraccion(
             fuente=_FUENTE,
@@ -130,6 +140,14 @@ def buscar_plan_gobierno(
     ]
     urls = sorted({r["pdf"] for r in resultados if r["pdf"]})
 
+    mensaje = (
+        f"RAG devolvio {len(resultados)} pasaje(s)"
+        + (f" del plan de {candidato.nombre_corto}" if candidato else " (multi-candidato)")
+        + f" para '{consulta}'."
+    )
+    if fallback_global:
+        mensaje += " Se usaron resultados globales porque no se agotaron los pasajes filtrados por candidato."
+
     return ResultadoExtraccion(
         fuente=_FUENTE,
         tool=_NOMBRE,
@@ -138,11 +156,7 @@ def buscar_plan_gobierno(
         resultados=resultados,
         total_resultados=len(resultados),
         urls_oficiales=urls,
-        mensaje=(
-            f"RAG devolvio {len(resultados)} pasaje(s)"
-            + (f" del plan de {candidato.nombre_corto}" if candidato else " (multi-candidato)")
-            + f" para '{consulta}'."
-        ),
+        mensaje=mensaje,
     )
 
 

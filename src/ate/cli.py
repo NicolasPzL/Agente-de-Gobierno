@@ -19,6 +19,10 @@ import logging
 import sys
 from typing import List, Optional
 
+import langchain
+if not hasattr(langchain, 'debug'):
+    langchain.debug = False
+
 from ate.graph.builder import construir_grafo
 from ate.schemas.state import EstadoGrafo
 
@@ -74,6 +78,10 @@ def main(argv: Optional[List[str]] = None) -> int:
         "pregunta": args.pregunta,
         "plan": plan.model_dump(mode="json"),
     }
+
+    respuesta_final = estado_final.get("respuesta_final")
+    if respuesta_final:
+        salida["respuesta_final"] = respuesta_final
 
     contexto = estado_final.get("contexto_extraido")
     if contexto is not None and not args.solo_plan:
@@ -166,7 +174,17 @@ def main(argv: Optional[List[str]] = None) -> int:
         else:
             salida["validacion"] = validacion.model_dump(mode="json")
 
-    print(json.dumps(salida, ensure_ascii=False, indent=2))
+    # --- Final Output ---
+    respuesta_final = salida.get("respuesta_final")
+    if respuesta_final:
+        print("\n================================================================================\n")
+        print(f"RESPUESTA DEL AGENTE:\n\n{respuesta_final}")
+        print("\n================================================================================\n")
+    elif not args.verbose:
+        print("\nEl agente no pudo generar una respuesta final argumentada. Use -v para ver los detalles técnicos.")
+
+    if args.verbose:
+        print(json.dumps(salida, ensure_ascii=False, indent=2))
     return 0
 
 

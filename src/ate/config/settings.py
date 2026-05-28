@@ -134,6 +134,22 @@ def _float(env: str, default: float) -> float:
         raise ValueError(f"{env} debe ser numerico: {exc}") from exc
 
 
+def _ollama_reachable(host: str, timeout: float = 1.5) -> bool:
+    """Detecta si hay un servidor Ollama accesible en el host configurado."""
+    try:
+        import json
+        import urllib.request
+        import urllib.error
+
+        url = f"{host.rstrip('/')}/api/models"
+        req = urllib.request.Request(url, method="GET")
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            body = resp.read().decode("utf-8")
+            return bool(body and ("name" in body or body.strip().startswith("[")))
+    except Exception:
+        return False
+
+
 def load_settings() -> Settings:
     """Carga la configuracion desde `.env` + entorno.
 
@@ -143,14 +159,22 @@ def load_settings() -> Settings:
     """
     load_dotenv()  # idempotente; no sobreescribe variables ya exportadas
 
-    provider_raw = (os.getenv("ATE_LLM_PROVIDER") or "none").strip().lower()
+    env_llm_provider = os.getenv("ATE_LLM_PROVIDER")
+    provider_raw = (env_llm_provider or "none").strip().strip(",").lower()
     if provider_raw not in _PROVIDERS_VALIDOS:
         raise ValueError(
             f"ATE_LLM_PROVIDER invalido: {provider_raw!r}. "
             f"Valores soportados: {', '.join(_PROVIDERS_VALIDOS)}."
         )
 
-    news_raw = (os.getenv("ATE_NEWS_PROVIDER") or _DEFAULT_NEWS_PROVIDER).strip().lower()
+    if provider_raw == "none" and not env_llm_provider:
+        # Si no se configuró explicitamente el provider y hay un Ollama
+        # local disponible, lo asumimos como proveedor de LLM.
+        ollama_host = os.getenv("OLLAMA_HOST", "http://127.0.0.1:11434").rstrip("/")
+        if _ollama_reachable(ollama_host):
+            provider_raw = "ollama"
+
+    news_raw = (os.getenv("ATE_NEWS_PROVIDER") or _DEFAULT_NEWS_PROVIDER).strip().strip(",").lower()
     if news_raw not in ("tavily", "serper", "none"):
         raise ValueError(
             f"ATE_NEWS_PROVIDER invalido: {news_raw!r}. "
@@ -164,8 +188,8 @@ def load_settings() -> Settings:
         anthropic_model=os.getenv("ATE_ANTHROPIC_MODEL", "claude-sonnet-4-6"),
         openai_api_key=os.getenv("OPENAI_API_KEY") or None,
         openai_model=os.getenv("ATE_OPENAI_MODEL", "gpt-4o"),
-        ollama_host=os.getenv("OLLAMA_HOST", "http://127.0.0.1:11434").rstrip("/"),
-        ollama_model=os.getenv("OLLAMA_MODEL", "llama3.2:3b"),
+        ollama_host=os.getenv("OLLAMA_HOST", "http://127.0.0.1:11434").strip().strip(",").rstrip("/"),
+        ollama_model=os.getenv("OLLAMA_MODEL", "llama3.2:3b").strip().strip(","),
         ollama_timeout=_float("OLLAMA_TIMEOUT", 60.0),
 
         # --- HTTP ---

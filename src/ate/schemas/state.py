@@ -302,5 +302,7 @@ class EstadoGrafo(TypedDict, total=False):
     contraste: Optional[ContextoContraste]          # Sprint 4
     validacion: Optional[ContextoValidacion]        # Sprint 4
 
-    # --- Hook para sprint futuro (no poblar todavia) ---
-    # respuesta_final: str         # Sprint 5: texto generado con citacion
+    # --- Sprint 5: Salida final ---
+    respuesta_final: Optional[str]
+    llm_info: Optional[dict]
+

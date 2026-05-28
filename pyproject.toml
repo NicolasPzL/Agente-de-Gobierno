@@ -5,18 +5,18 @@ build-backend = "hatchling.build"
 [project]
 name = "ate"
 version = "0.4.0"
-description = "Agente de Transparencia Electoral (ATE) - Colombia 2026. Sprint 4: contraste propuestas vs datos reales + validacion de fuentes oficiales."
+description = "Agente de Transparencia Electoral (ATE) - Colombia 2026. Sprint 5: generación de respuestas analíticas y validación E2E."
 readme = "README.md"
 requires-python = ">=3.11"
 authors = [{ name = "Mateo Giraldo" }]
 dependencies = [
-    "langgraph>=0.2,<1.0",
-    "langchain-core>=0.3,<1.0",
+    "langgraph>=0.2",
+    "langchain-core>=0.3",
     "pydantic>=2.6,<3",
     "python-dotenv>=1.0,<2",
     "requests>=2.31,<3",
     "pypdf>=4.0,<7",
-    "chromadb>=0.5,<2",
+    "chromadb>=0.5",
 ]
 
 [project.optional-dependencies]

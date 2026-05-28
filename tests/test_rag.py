@@ -161,6 +161,46 @@ def test_rag_sin_pasajes_es_sin_datos(monkeypatch):
     assert ctx.estado == "sin_datos"
 
 
+def test_rag_fallback_global_si_filtro_candidato_no_retiene_pasajes(monkeypatch):
+    cfg = _cfg()
+    cep = por_id("ivan-cepeda")
+    plan = PlanEjecucion(
+        intencion=Intencion.PLAN_GOBIERNO,
+        tools=["buscar_plan_gobierno"],
+        candidato=cep,
+    )
+
+    hits_candidate = []
+    hits_global = [
+        Hit(
+            chunk_id="ivan-cepeda:p1:c0",
+            texto="Fallback global: derechos humanos...",
+            metadata={
+                "candidato_id": "ivan-cepeda",
+                "candidato_nombre": "Ivan Cepeda Castro",
+                "pdf": "public/Candidatos/x.pdf",
+                "pagina": 5,
+            },
+            distancia=0.42,
+        )
+    ]
+
+    cliente_mock = MagicMock()
+    cliente_mock.contar.return_value = 13
+    cliente_mock.buscar.side_effect = [hits_candidate, hits_global]
+
+    import ate.rag.cliente as cliente_mod
+    monkeypatch.setattr(cliente_mod, "abrir_cliente", lambda *a, **k: cliente_mock)
+
+    ctx = consultar_rag("derechos humanos", plan, cfg)
+    assert ctx.estado == "ok"
+    assert ctx.candidato_filtro is None
+    assert "globales" in ctx.mensaje
+    assert len(ctx.pasajes) == 1
+    cliente_mock.buscar.assert_any_call("derechos humanos", k=cfg.rag_top_k, candidato_id="ivan-cepeda")
+    cliente_mock.buscar.assert_any_call("derechos humanos", k=cfg.rag_top_k)
+
+
 # ---------------- tool buscar_plan_gobierno ----------------
 
 
@@ -216,6 +256,40 @@ def test_tool_con_filtro_candidato(monkeypatch):
     assert r.estado == "ok"
     assert r.total_resultados == 1
     cliente_mock.buscar.assert_called_with("derechos", k=cfg.rag_top_k, candidato_id="ivan-cepeda")
+
+
+def test_tool_fallback_global_si_filtro_candidato_no_retiene_pasajes(monkeypatch):
+    cfg = _cfg()
+    cep = por_id("ivan-cepeda")
+
+    hits_candidate = []
+    hits_global = [
+        Hit(
+            chunk_id="ivan-cepeda:p1:c0",
+            texto="Fallback global: derechos humanos...",
+            metadata={
+                "candidato_id": "ivan-cepeda",
+                "candidato_nombre": "Ivan Cepeda Castro",
+                "pdf": "public/Candidatos/x.pdf",
+                "pagina": 5,
+            },
+            distancia=0.42,
+        )
+    ]
+
+    cliente_mock = MagicMock()
+    cliente_mock.contar.return_value = 13
+    cliente_mock.buscar.side_effect = [hits_candidate, hits_global]
+
+    import ate.rag.cliente as cliente_mod
+    monkeypatch.setattr(cliente_mod, "abrir_cliente", lambda *a, **k: cliente_mock)
+
+    r = buscar_plan_gobierno("derechos", settings=cfg, candidato=cep)
+    assert r.estado == "ok"
+    assert r.total_resultados == 1
+    assert "globales" in r.mensaje
+    cliente_mock.buscar.assert_any_call("derechos", k=cfg.rag_top_k, candidato_id="ivan-cepeda")
+    cliente_mock.buscar.assert_any_call("derechos", k=cfg.rag_top_k)
 
 
 # ---------------- ingestor ----------------

@@ -256,7 +256,7 @@ def _invocar_llm_ollama(pregunta: str, settings: Settings) -> Tuple[Intencion, s
         # traen activo por defecto (qwen3, deepseek-r1, etc.). Sin esto
         # el JSON sale en `thinking` y `response` queda vacio.
         "think": False,
-        "options": {"temperature": 0},
+        "options": {"temperature": 0, "max_output_tokens": 64},
     }
     url = f"{settings.ollama_host}/api/generate"
     req = urllib.request.Request(
@@ -266,8 +266,9 @@ def _invocar_llm_ollama(pregunta: str, settings: Settings) -> Tuple[Intencion, s
         method="POST",
     )
 
+    timeout = settings.ollama_timeout
     try:
-        with urllib.request.urlopen(req, timeout=settings.ollama_timeout) as resp:
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
             body = json.loads(resp.read().decode("utf-8"))
     except urllib.error.HTTPError as exc:
         detalle = ""
@@ -275,6 +276,12 @@ def _invocar_llm_ollama(pregunta: str, settings: Settings) -> Tuple[Intencion, s
             detalle = exc.read().decode("utf-8", errors="ignore")
         except Exception:  # pragma: no cover - defensivo
             pass
+        diagnostics = detalle.lower()
+        if exc.code == 404 or "model not found" in diagnostics or "unknown model" in diagnostics or "no model named" in diagnostics:
+            raise RuntimeError(
+                f"Ollama devolvió HTTP {exc.code} en {url} y el modelo {settings.ollama_model!r} no está disponible. "
+                f"Verifica que el modelo exista o que el servidor Ollama tenga acceso a él. Detalle: {detalle or exc.reason}"
+            ) from exc
         raise RuntimeError(
             f"Ollama devolvio HTTP {exc.code} en {url} "
             f"(modelo={settings.ollama_model!r}): {detalle or exc.reason}"
@@ -283,7 +290,7 @@ def _invocar_llm_ollama(pregunta: str, settings: Settings) -> Tuple[Intencion, s
         raise RuntimeError(f"Ollama inalcanzable en {url}: {exc.reason}") from exc
     except TimeoutError as exc:
         raise RuntimeError(
-            f"Ollama excedio el timeout de {settings.ollama_timeout}s en {url}"
+            f"Ollama excedio el timeout de {timeout}s en {url}"
         ) from exc
 
     # `response` es el campo estandar. Algunos modelos de razonamiento
@@ -321,16 +328,11 @@ def _invocar_llm_ollama(pregunta: str, settings: Settings) -> Tuple[Intencion, s
 def planificar(pregunta: str, settings: Settings | None = None) -> PlanEjecucion:
     """Genera el plan de ejecucion para una pregunta.
 
-    Sprint 2.5: ademas de clasificar la intencion, detecta el candidato
-    mencionado (si lo hay) para que el extractor pueda reescribir la
-    consulta por tool.
-
-    Args:
-        pregunta: texto del usuario.
-        settings: configuracion a usar. Si es `None` se carga desde entorno.
-
-    Returns:
-        `PlanEjecucion` con intencion, tools, razonamiento y candidato.
+    Sprint 2.5 + Comprehensive Mode:
+    Si se detecta un candidato, el sistema activa el 'Modo de Auditoria Integral',
+    invocando todas las fuentes de datos disponibles para garantizar que la
+    respuesta final sea la mas completa y argumentada posible, independientemente
+    de la intencion detectada.
     """
     if not pregunta or not pregunta.strip():
         return PlanEjecucion(
@@ -348,17 +350,30 @@ def planificar(pregunta: str, settings: Settings | None = None) -> PlanEjecucion
 
     # Deteccion deterministica del candidato (no toca red).
     candidato = detectar_candidato(pregunta)
+
+    # Selección de tools
+    tools = tools_para(intencion)
+
     if candidato is not None:
         razon = f"{razon} Candidato detectado: {candidato.nombre_corto} ({candidato.partido})."
 
-    # Si la pregunta menciona un candidato pero la intencion quedo
-    # `indefinida`, dejamos `indefinida` (el usuario quizas pregunto
-    # algo que no encaja en las categorias). El validador del Sprint 4
-    # decidira que hacer.
+        # MODO AUDITORIA INTEGRAL:
+        # Si hay un candidato, forzamos la consulta de todas las fuentes oficiales
+        # para permitir el contraste profundo en la fase final.
+        fuentes_integrales = {
+            "consultar_secop",
+            "consultar_datos_abiertos",
+            "consultar_cne",
+            "buscar_noticias"
+        }
+
+        # Fusionamos las tools de la intencion con el set integral
+        tools = list(set(tools).union(fuentes_integrales))
+        razon = f"Modo de Auditoria Integral activado: se consultaran todas las fuentes para {candidato.nombre_corto}. {razon}"
 
     return PlanEjecucion(
         intencion=intencion,
-        tools=tools_para(intencion),
+        tools=tools,
         razonamiento=razon.strip(),
         candidato=candidato,
     )

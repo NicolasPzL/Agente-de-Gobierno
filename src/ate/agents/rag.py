@@ -132,6 +132,7 @@ def consultar_rag(
 
     candidato_id = plan.candidato.id if plan and plan.candidato else None
 
+    fallback_global = False
     try:
         hits = cliente.buscar(
             pregunta,
@@ -147,6 +148,23 @@ def consultar_rag(
             estado="error_parseo",
             mensaje=f"Fallo de busqueda RAG: {exc}",
         )
+
+    if not hits and candidato_id:
+        try:
+            global_hits = cliente.buscar(pregunta, k=cfg.rag_top_k)
+        except Exception as exc:  # noqa: BLE001
+            logger.exception("Fallo busqueda RAG global de respaldo")
+            return ContextoRag(
+                consulta=pregunta,
+                candidato_filtro=candidato_id,
+                pasajes=[],
+                estado="error_parseo",
+                mensaje=f"Fallo de busqueda RAG global de respaldo: {exc}",
+            )
+        if global_hits:
+            hits = global_hits
+            candidato_id = None
+            fallback_global = True
 
     if not hits:
         return ContextoRag(
@@ -176,16 +194,20 @@ def consultar_rag(
             )
         )
 
+    mensaje = (
+        f"RAG: {len(pasajes)} pasaje(s)"
+        + (f" del candidato {candidato_id}" if candidato_id else " (busqueda global)")
+        + f" para '{pregunta}'."
+    )
+    if fallback_global:
+        mensaje += " Se usaron resultados globales porque no se encontraron pasajes filtrados por candidato."
+
     return ContextoRag(
         consulta=pregunta,
         candidato_filtro=candidato_id,
         pasajes=pasajes,
         estado="ok",
-        mensaje=(
-            f"RAG: {len(pasajes)} pasaje(s)"
-            + (f" del candidato {candidato_id}" if candidato_id else " (busqueda global)")
-            + f" para '{pregunta}'."
-        ),
+        mensaje=mensaje,
     )
 
 

@@ -24,11 +24,34 @@ from ate.agents.extraccion import nodo_extraccion
 from ate.agents.planificador import nodo_planificador
 from ate.agents.rag import nodo_rag
 from ate.agents.validador import nodo_validador
+from ate.agents.generador import nodo_generador
 from ate.schemas.state import EstadoGrafo
 
 
+def ruta_despues_de_planificar(estado: EstadoGrafo) -> list[str]:
+    """Decide si saltar directamente al generador o realizar auditoria completa.
+
+    Fast-path: si no hay tools requeridas y no se detecto candidato,
+    se asume que es una consulta simple (ej. saludo) y se va al generador.
+    """
+    plan = estado.get("plan")
+    if plan and not plan.tools and plan.candidato is None:
+        return ["generador"]
+    return ["extraccion", "rag"]
+
+
 def construir_grafo():
-    """Compila el grafo del Sprint 4.
+    """Compila el grafo del Sprint 4 con ejecución paralela de extracción y RAG.
+
+    Topología Optimizada con Fast-Path:
+        __start__ -> planificador
+        planificador -> (extraccion, rag)  [si requiere auditoria]
+        planificador -> generador         [si es consulta simple]
+        extraccion -> contraste
+        rag -> contraste
+        contraste -> validador
+        validador -> generador
+        generador -> END
 
     Returns:
         Un grafo LangGraph compilado, listo para `.invoke({"pregunta": ...})`.
@@ -39,21 +62,23 @@ def construir_grafo():
     grafo.add_node("rag", nodo_rag)
     grafo.add_node("contraste", nodo_contraste)
     grafo.add_node("validador", nodo_validador)
+    grafo.add_node("generador", nodo_generador)
 
     grafo.set_entry_point("planificador")
-    grafo.add_edge("planificador", "extraccion")
-    grafo.add_edge("extraccion", "rag")
-    grafo.add_edge("rag", "contraste")
-    grafo.add_edge("contraste", "validador")
-    grafo.add_edge("validador", END)
 
-    # ------------------------------------------------------------------
-    # Hook para sprint futuro (NO descomentar hasta que exista el modulo):
-    #
-    # from ate.agents.generador import nodo_generador        # sprint 5
-    # grafo.add_node("generador", nodo_generador)
-    # grafo.add_edge("validador", "generador")
-    # grafo.add_edge("generador", END)
-    # ------------------------------------------------------------------
+    # Enrutamiento condicional desde el planificador
+    # Al retornar una lista, LangGraph dispara los nodos en paralelo.
+    grafo.add_conditional_edges(
+        "planificador",
+        ruta_despues_de_planificar,
+    )
+
+    # Sincronización: el contraste espera que ambos terminen
+    grafo.add_edge("extraccion", "contraste")
+    grafo.add_edge("rag", "contraste")
+
+    grafo.add_edge("contraste", "validador")
+    grafo.add_edge("validador", "generador")
+    grafo.add_edge("generador", END)
 
     return grafo.compile()
