@@ -322,18 +322,38 @@ JSON tecnico:
 python -m ate "¿Que propone Sergio Fajardo en educacion?"
 ```
 
-### 13.1 Interfaz web
+### 13.1 Interfaz web FastAPI (recomendada)
+
+```powershell
+pip install -e ".[web]"
+uvicorn serve:app --reload
+```
+
+Abre http://localhost:8000. Es una consola dark que **streamea el
+progreso en vivo**: ves cada agente "pensar" (planificación → extracción
+→ RAG → contraste → validación → síntesis) en una linea de tiempo
+animada, con cronometro. Incluye:
+
+- **Interruptor "Análisis"** (arriba a la derecha): alterna entre ver
+  solo la respuesta final o toda la cadena de evidencia.
+- **Tema** claro/oscuro (boton ☾/☀).
+- Citaciones como enlaces a las fuentes oficiales.
+
+> El streaming SSE da feedback continuo aunque las APIs oficiales tarden
+> (modo online). Las fuentes tipograficas se cargan de Google Fonts; sin
+> internet se usan fuentes del sistema.
+
+### 13.2 Interfaz Streamlit (alternativa simple)
 
 ```powershell
 pip install -e ".[ui]"
 streamlit run app.py
 ```
 
-Abre http://localhost:8501. La app es un chat: escribe una pregunta y
-veras la respuesta final + una cadena de evidencia auditable (plan,
-contraste, RAG, extraccion, validacion) con enlaces a las fuentes.
+Abre http://localhost:8501. Chat con la misma cadena de evidencia
+(sin streaming por nodo).
 
-### 13.2 Activar el LLM del generador
+### 13.3 Activar el LLM del generador
 
 Igual que el planificador (seccion 8): configurar `ATE_LLM_PROVIDER`. Sin
 LLM, el generador usa su modo determinista (sin alucinaciones). En modo

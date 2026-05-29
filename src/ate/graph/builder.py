@@ -20,6 +20,18 @@ trazabilidad completa de la cadena de evidencia y evita ramas especiales.
 
 from __future__ import annotations
 
+# Compat: langchain 1.x ya no expone `langchain.debug`, pero langchain-core
+# aun lo lee por retrocompatibilidad al invocar el grafo (get_debug()), lo
+# que dispara un AttributeError. Garantizamos el atributo una sola vez aqui,
+# que es la ruta comun a CLI, web y tests (todos construyen el grafo).
+try:  # pragma: no cover - shim de compatibilidad
+    import langchain
+
+    if not hasattr(langchain, "debug"):
+        langchain.debug = False
+except Exception:  # noqa: BLE001 - si langchain no esta, no hay nada que parchar
+    pass
+
 from langgraph.graph import END, StateGraph
 
 from ate.agents.contraste import nodo_contraste

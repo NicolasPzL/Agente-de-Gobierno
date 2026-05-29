@@ -107,18 +107,38 @@ respuesta y los pasajes del plan se citan inline como
 
 ---
 
-## 4. Interfaz Streamlit (`app.py`)
+## 4. Interfaces
+
+### 4.1 Interfaz web FastAPI (recomendada)
+
+`serve.py` (backend) + `web/` (frontend HTML/CSS/JS). Diseño dark
+"consola forense" con acento dorado, tipografias Fraunces / Hanken
+Grotesk / JetBrains Mono.
 
 | Caracteristica | Detalle |
 | :-- | :-- |
-| Chat | `st.chat_input` + historial en `st.session_state` |
-| Grafo cacheado | `@st.cache_resource` compila el grafo una vez por sesion |
-| Auto-ingesta RAG | Si la base esta vacia y NO es offline, ingiere los PDFs al arrancar |
-| Cadena de evidencia | Expanders: plan, contraste, RAG, extraccion, validacion |
-| Citacion visible | Muestra URLs oficiales con enlaces y el badge de validacion |
-| Sidebar | Configuracion activa (red, LLM) + lista de candidatos 2026 |
+| Streaming en vivo | `GET /api/ask` emite **Server-Sent Events**: un evento por nodo a medida que el grafo avanza (`graph.stream(stream_mode="updates")`). El usuario ve el "pensamiento" paso a paso. |
+| Timeline | Linea de tiempo animada de los 6 agentes (pendiente → activo → hecho) con detalle y cronometro. |
+| Interruptor de análisis | Alterna entre ver solo la respuesta final o toda la cadena de evidencia. Aplica en vivo y retroactivamente. |
+| Tema | Modo oscuro (default) + claro, persistido en `localStorage`. |
+| Citación | URLs oficiales validadas renderizadas como enlaces; pasajes del plan con página y score. |
+| Endpoints | `GET /` (frontend), `GET /api/config` (estado + candidatos), `GET /api/ask?q=` (SSE). |
 
 Ejecutar:
+
+```powershell
+pip install -e ".[web]"
+uvicorn serve:app --reload      # o: python serve.py
+# Abrir http://localhost:8000
+```
+
+> El frontend carga fuentes desde Google Fonts (requiere internet); sin
+> red usa fuentes del sistema como respaldo. El streaming SSE da feedback
+> continuo incluso cuando las APIs oficiales tardan (modo online).
+
+### 4.2 Interfaz Streamlit (alternativa simple)
+
+`app.py` — chat con la misma cadena de evidencia, sin streaming por nodo.
 
 ```powershell
 pip install -e ".[ui]"
@@ -143,7 +163,7 @@ Entregables declarativos del sprint:
 | Entregable | Ubicacion |
 | :-- | :-- |
 | Sistema multiagente completo | `src/ate/graph/builder.py` (6 nodos) |
-| Interfaz funcional | `app.py` (Streamlit) |
+| Interfaz funcional | `serve.py` + `web/` (FastAPI, recomendada) · `app.py` (Streamlit) |
 | Respuestas con fuentes citadas | `src/ate/agents/generador.py` |
 | Documentacion | `docs/arquitectura_sprint{4,5}.md`, `README.md`, `CLAUDE.md` |
 

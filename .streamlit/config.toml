@@ -1,5 +1,5 @@
-# Tema nativo de Streamlit para la interfaz del ATE.
-# Paleta civica sobria: azul de confianza + neutros slate.
+# Tema nativo de Streamlit para la interfaz simple (app.py).
+# La interfaz recomendada es la web FastAPI (ver `serve.py`).
 
 [theme]
 base = "light"
@@ -8,9 +8,3 @@ backgroundColor = "#FFFFFF"
 secondaryBackgroundColor = "#F1F5F9"
 textColor = "#0F172A"
 font = "sans serif"
-
-[client]
-toolbarMode = "minimal"
-
-[ui]
-hideTopBar = true

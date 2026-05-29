@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="es" data-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ATE — Agente de Transparencia Electoral 2026</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=Hanken+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"
+    rel="stylesheet"
+  />
+  <link rel="stylesheet" href="/static/styles.css" />
+</head>
+<body class="analysis">
+  <div class="bg" aria-hidden="true"></div>
+  <div class="grain" aria-hidden="true"></div>
+
+  <div class="shell">
+    <!-- Sidebar -->
+    <aside class="sidebar" id="sidebar">
+      <div class="brand">
+        <span class="brand-mark" aria-hidden="true"></span>
+        <div class="brand-text">
+          <strong>ATE</strong>
+          <span>Transparencia Electoral</span>
+        </div>
+      </div>
+
+      <div class="rail-section">
+        <p class="rail-title">Estado del sistema</p>
+        <div class="status-grid" id="status-grid">
+          <div class="status-item"><span class="k">Red</span><span class="v" id="st-red">—</span></div>
+          <div class="status-item"><span class="k">Modelo</span><span class="v" id="st-llm">—</span></div>
+        </div>
+      </div>
+
+      <div class="rail-section grow">
+        <p class="rail-title">Candidatos 2026</p>
+        <ul class="cand-list" id="cand-list"></ul>
+      </div>
+
+      <div class="rail-foot">
+        <span class="dot-live"></span> Auditoría ciudadana basada en evidencia
+      </div>
+    </aside>
+
+    <!-- Main -->
+    <main class="main">
+      <header class="topbar">
+        <button class="icon-btn only-mobile" id="menu-btn" aria-label="Menú">☰</button>
+        <div class="topbar-title">
+          <span class="tag">Colombia · Elecciones 2026</span>
+        </div>
+        <div class="topbar-controls">
+          <label class="switch" title="Mostrar el flujo de análisis del agente">
+            <input type="checkbox" id="analysis-toggle" checked />
+            <span class="switch-track"><span class="switch-thumb"></span></span>
+            <span class="switch-label" id="analysis-label">Análisis</span>
+          </label>
+          <button class="icon-btn" id="theme-btn" aria-label="Cambiar tema">☾</button>
+        </div>
+      </header>
+
+      <div class="transcript" id="transcript">
+        <section class="empty" id="empty">
+          <span class="kicker">Auditoría radical basada en evidencia</span>
+          <h1>Pregúntale a la<br /><em>evidencia</em>, no a las promesas.</h1>
+          <p>
+            Cruzo las propuestas de los planes de gobierno con datos oficiales de
+            contratación, sanciones y financiación. Cito cada fuente y declaro
+            cuando no hay datos — nunca invento.
+          </p>
+          <div class="chips" id="example-chips"></div>
+        </section>
+      </div>
+
+      <form class="composer" id="composer" autocomplete="off">
+        <div class="composer-field">
+          <textarea
+            id="prompt"
+            rows="1"
+            placeholder="¿Qué propone Iván Cepeda sobre derechos humanos?"
+            maxlength="500"
+          ></textarea>
+          <button type="submit" class="send-btn" id="send-btn" aria-label="Enviar">
+            <span class="send-ico">→</span>
+          </button>
+        </div>
+        <p class="composer-hint">
+          Enter para enviar · Shift+Enter para salto de línea
+        </p>
+      </form>
+    </main>
+  </div>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>

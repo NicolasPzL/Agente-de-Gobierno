@@ -65,8 +65,8 @@ _CSS = """
     --ate-neutral: #94A3B8;
 }
 
-/* Limpieza del chrome de Streamlit */
-#MainMenu, footer, header [data-testid="stToolbar"] { visibility: hidden; }
+/* Limpieza ligera (sin ocultar el control del sidebar) */
+footer { visibility: hidden; }
 .block-container { padding-top: 2.2rem; padding-bottom: 6rem; max-width: 1100px; }
 
 /* Hero */
