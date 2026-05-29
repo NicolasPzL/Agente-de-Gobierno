@@ -80,3 +80,21 @@ def test_e2e_neutrality_check():
     prohibidas = ["bueno", "malo", "excelente", "terrible", "sospechoso", "increible"]
     for p in prohibidas:
         assert p not in respuesta, f"La respuesta contiene un juicio de valor: {p}"
+
+
+def test_e2e_todos_los_nodos_corren_para_indefinida():
+    """Aun para una pregunta indefinida (saludo), el grafo recorre todos los
+    nodos y deja la cadena de evidencia completa en el estado final. No debe
+    existir un fast-path que saltee extraccion/rag/contraste/validacion."""
+    import os
+    os.environ["ATE_OFFLINE"] = "1"
+    os.environ["ATE_LLM_PROVIDER"] = "none"
+
+    grafo = construir_grafo()
+    resultado = grafo.invoke({"pregunta": "Hola, como estas"})
+
+    for clave in ("plan", "contexto_extraido", "contexto_rag", "contraste", "validacion", "respuesta_final"):
+        assert clave in resultado, f"Falta '{clave}' en el estado final"
+
+    # Sin candidato detectado, el contraste debe declararlo (no inventar).
+    assert resultado["contraste"].estado == "sin_candidato"

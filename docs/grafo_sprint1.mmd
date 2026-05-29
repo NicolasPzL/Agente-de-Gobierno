@@ -8,11 +8,18 @@ graph TD;
 	planificador(planificador)
 	extraccion(extraccion)
 	rag(rag)
+	contraste(contraste)
+	validador(validador)
+	generador(generador)
 	__end__([<p>__end__</p>]):::last
 	__start__ --> planificador;
-	extraccion --> rag;
+	contraste --> validador;
+	extraccion --> contraste;
 	planificador --> extraccion;
-	rag --> __end__;
+	planificador --> rag;
+	rag --> contraste;
+	validador --> generador;
+	generador --> __end__;
 	classDef default fill:#f2f0ff,line-height:1.2
 	classDef first fill-opacity:0
 	classDef last fill:#bfb6fc

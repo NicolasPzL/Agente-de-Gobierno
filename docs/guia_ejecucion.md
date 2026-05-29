@@ -1,4 +1,4 @@
-# Guia paso a paso - ejecutar y probar Sprints 1, 2, 2.5 y 3
+# Guia paso a paso - ejecutar y probar Sprints 1-5
 
 Esta guia te lleva desde cero hasta correr los tests, la demo CLI
 offline y la demo CLI con APIs reales (datos.gov.co / SECOP). Cubre
@@ -97,16 +97,10 @@ python -m ate --help
 pytest
 ```
 
-Salida esperada (79 casos, ~3 segundos):
+Salida esperada (236 casos, ~3 segundos):
 
 ```
-tests\test_extraccion.py ...........                           [13%]
-tests\test_graph.py .......                                     [22%]
-tests\test_planificador.py ....................                 [47%]
-tests\test_tools.py .............                               [63%]
-tests\test_tools_apis.py ............................          [100%]
-
-============================ 79 passed in 3.07s ============================
+============================ 236 passed in 3.5s ============================
 ```
 
 ### 4.1 Ejecutar archivos / tests individuales
@@ -301,9 +295,46 @@ con los pasajes recuperados (PDF, pagina, score).
 python scripts/ingestar_planes.py --solo paloma-valencia --reset
 ```
 
-### 11.3 Que viene despues
+---
 
-- **Sprint 4:** agentes de contraste y validador, + ciclo
-  `validador -> extraccion`.
-- **Sprint 5:** agente generador con citacion + interfaz +
-  demo end-to-end.
+## 12. Sprint 4 - Contraste y validacion
+
+Estos agentes corren automaticamente dentro del grafo. Para verlos en la
+salida del CLI usa `--resumen`:
+
+```powershell
+$env:ATE_OFFLINE="0"
+python -m ate --resumen "¿Que contratos tiene Ivan Cepeda y que propone en salud?"
+```
+
+La salida incluye `contraste` (inconsistencias propuesta vs. datos) y
+`validacion` (dominios oficiales detectados).
+
+---
+
+## 13. Sprint 5 - Respuesta final + interfaz Streamlit
+
+El grafo termina en el **agente generador**, que produce
+`respuesta_final` con citacion obligatoria. El CLI la imprime arriba del
+JSON tecnico:
+
+```powershell
+python -m ate "¿Que propone Sergio Fajardo en educacion?"
+```
+
+### 13.1 Interfaz web
+
+```powershell
+pip install -e ".[ui]"
+streamlit run app.py
+```
+
+Abre http://localhost:8501. La app es un chat: escribe una pregunta y
+veras la respuesta final + una cadena de evidencia auditable (plan,
+contraste, RAG, extraccion, validacion) con enlaces a las fuentes.
+
+### 13.2 Activar el LLM del generador
+
+Igual que el planificador (seccion 8): configurar `ATE_LLM_PROVIDER`. Sin
+LLM, el generador usa su modo determinista (sin alucinaciones). En modo
+offline la app omite la auto-ingesta del RAG.

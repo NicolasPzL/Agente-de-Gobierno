@@ -359,16 +359,20 @@ def planificar(pregunta: str, settings: Settings | None = None) -> PlanEjecucion
 
         # MODO AUDITORIA INTEGRAL:
         # Si hay un candidato, forzamos la consulta de todas las fuentes oficiales
-        # para permitir el contraste profundo en la fase final.
-        fuentes_integrales = {
+        # para permitir el contraste profundo en la fase final. El orden es
+        # estable (primero las tools de la intencion, luego el resto de fuentes
+        # integrales en orden fijo) para preservar la trazabilidad: misma
+        # pregunta -> mismo plan, ejecucion tras ejecucion.
+        fuentes_integrales = (
             "consultar_secop",
             "consultar_datos_abiertos",
             "consultar_cne",
-            "buscar_noticias"
-        }
-
-        # Fusionamos las tools de la intencion con el set integral
-        tools = list(set(tools).union(fuentes_integrales))
+            "buscar_noticias",
+        )
+        tools = list(tools)
+        for fuente in fuentes_integrales:
+            if fuente not in tools:
+                tools.append(fuente)
         razon = f"Modo de Auditoria Integral activado: se consultaran todas las fuentes para {candidato.nombre_corto}. {razon}"
 
     return PlanEjecucion(

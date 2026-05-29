@@ -17,7 +17,7 @@ from __future__ import annotations
 
 import json
 import logging
-from typing import Optional
+from typing import Any, List, Optional
 
 from ate.config.settings import Settings, load_settings
 from ate.schemas.state import (
@@ -186,7 +186,37 @@ def generar(pregunta: str, estado: EstadoGrafo, settings: Optional[Settings] = N
     return _generar_fallback(pregunta, candidato, estado)
 
 
-def _limpiar_resultado_crudo(resultado: any) -> str:
+def _citas_oficiales(estado: EstadoGrafo) -> List[str]:
+    """Recopila las URLs oficiales validadas para citacion obligatoria.
+
+    Prioriza el contexto de validacion (Sprint 4), que ya filtro las URLs
+    por dominio oficial colombiano. Si no hay validacion disponible, cae a
+    las `urls_oficiales` crudas del contexto extraido. Deduplica preservando
+    el orden de aparicion. Nunca inventa: si no hay URLs, devuelve [].
+    """
+    urls: List[str] = []
+    vistas: set = set()
+
+    val = estado.get("validacion")
+    if val is not None:
+        for fuente in val.fuentes_validadas:
+            if fuente.es_oficial and fuente.url and fuente.url not in vistas:
+                urls.append(fuente.url)
+                vistas.add(fuente.url)
+
+    if not urls:
+        ext = estado.get("contexto_extraido")
+        if ext is not None:
+            for r in ext.resultados:
+                for url in r.urls_oficiales:
+                    if url and url not in vistas:
+                        urls.append(url)
+                        vistas.add(url)
+
+    return urls
+
+
+def _limpiar_resultado_crudo(resultado: Any) -> str:
     """Convierte datos crudos (listas/dicts) en una frase compacta y legible."""
     if not resultado:
         return "no se encontraron datos relevantes"
@@ -259,17 +289,34 @@ def _generar_fallback(pregunta: str, candidato: str, estado: EstadoGrafo) -> str
         if inconsistencias:
             conclusion += ". En particular, " + " y ".join(inconsistencias)
 
+    citas = _citas_oficiales(estado)
+
     conclusion = conclusion.strip()
     if not conclusion.endswith("."):
         conclusion += "."
 
     if (not evidencias and not plan_textos) and (not con or con.estado != "ok"):
-        return (
+        base = (
             f"Análisis de Transparencia Electoral para {candidato}: no se ha encontrado evidencia oficial suficiente "
             f"para generar un análisis detallado sobre {candidato} respecto a '{pregunta}'."
         )
+        return _anexar_citas(base, citas)
 
-    return conclusion
+    return _anexar_citas(conclusion, citas)
+
+
+def _anexar_citas(texto: str, citas: List[str]) -> str:
+    """Anexa las fuentes oficiales al final del texto (citacion obligatoria).
+
+    Si no hay URLs validadas, devuelve el texto sin modificar. Nunca inventa
+    fuentes: solo cita lo que el validador confirmo como oficial.
+    """
+    if not citas:
+        return texto
+    texto = texto.rstrip()
+    if not texto.endswith("."):
+        texto += "."
+    return f"{texto} Fuentes oficiales: {', '.join(citas)}."
 
 
 def _sanitizar_texto(texto: str) -> str:
@@ -396,50 +443,38 @@ def _invocar_llm_ollama(pregunta: str, candidato: str, secciones: dict, settings
     url = f"{settings.ollama_host}/api/generate"
     timeout = settings.ollama_timeout
 
+    req = urllib.request.Request(
+        url,
+        data=json.dumps(payload).encode("utf-8"),
+        headers={"Content-Type": "application/json"},
+        method="POST",
+    )
+
     try:
-        req = urllib.request.Request(
-            url,
-            data=json.dumps(payload).encode("utf-8"),
-            headers={"Content-Type": "application/json"},
-            method="POST",
-        )
         with urllib.request.urlopen(req, timeout=timeout) as resp:
             body = json.loads(resp.read().decode("utf-8"))
-            return _extraer_texto_ollama(body)
+    except urllib.error.HTTPError as exc:
         detalle = ""
         try:
-            detalle = e.read().decode("utf-8", errors="ignore")
-        except Exception:
+            detalle = exc.read().decode("utf-8", errors="ignore")
+        except Exception:  # pragma: no cover - defensivo
             pass
-
         diagnostics = detalle.lower()
-        if e.code == 404 or "model not found" in diagnostics or "unknown model" in diagnostics or "no model named" in diagnostics:
-            logger.warning(f"Modelo {settings.ollama_model} no encontrado. Intentando descarga automática...")
-            try:
-                pull_payload = {"name": settings.ollama_model}
-                pull_url = f"{settings.ollama_host}/api/pull"
-                pull_req = urllib.request.Request(
-                    pull_url,
-                    data=json.dumps(pull_payload).encode("utf-8"),
-                    headers={"Content-Type": "application/json"},
-                    method="POST",
-                )
-                urllib.request.urlopen(pull_req, timeout=10)
-                logger.info("Descarga del modelo iniciada en segundo plano. La próxima consulta debería funcionar.")
-            except Exception as pull_err:
-                logger.error(f"Error al intentar descargar el modelo automáticamente: {pull_err}")
-
+        if exc.code == 404 or "model not found" in diagnostics or "no model named" in diagnostics:
             raise RuntimeError(
-                f"El modelo {settings.ollama_model} no está instalado o no se encuentra disponible. Intenté descargarlo automáticamente. Por favor, espera y vuelve a intentar."
-            )
-
+                f"El modelo {settings.ollama_model!r} no esta disponible en Ollama ({url}). "
+                f"Ejecuta `ollama pull {settings.ollama_model}` y reintenta. "
+                f"Detalle: {detalle or exc.reason}"
+            ) from exc
         raise RuntimeError(
-            f"Ollama HTTP {e.code} en {url}: {detalle or e.reason}"
-        ) from e
-    except urllib.error.URLError as e:
-        raise RuntimeError(f"Ollama inalcanzable en {url}: {e.reason}") from e
-    except TimeoutError as e:
-        raise RuntimeError(f"Ollama excedió el timeout de {timeout}s en {url}") from e
+            f"Ollama devolvio HTTP {exc.code} en {url}: {detalle or exc.reason}"
+        ) from exc
+    except urllib.error.URLError as exc:
+        raise RuntimeError(f"Ollama inalcanzable en {url}: {exc.reason}") from exc
+    except TimeoutError as exc:
+        raise RuntimeError(f"Ollama excedio el timeout de {timeout}s en {url}") from exc
+
+    return _extraer_texto_ollama(body)
 
 
 def nodo_generador(estado: EstadoGrafo) -> EstadoGrafo:

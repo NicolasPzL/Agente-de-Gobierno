@@ -21,6 +21,7 @@ dependencies = [
 
 [project.optional-dependencies]
 llm-anthropic = ["langchain-anthropic>=0.2,<1.0"]
+ui = ["streamlit>=1.30"]
 dev = [
     "pytest>=8,<9",
     "langchain-anthropic>=0.2,<1.0",

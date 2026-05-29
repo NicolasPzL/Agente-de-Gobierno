@@ -1434,48 +1434,42 @@ print(estado.respuesta_final)
 
 ---
 
-### 🔄 Sprint 4 - Contraste y Validación (80% COMPLETO)
+### ✅ Sprint 4 - Contraste y Validación (COMPLETO)
 
 **Objetivo**: Cruzar información y validar veracidad.
 
 **Entregables**:
-- ✅ Agente Contraste (detecta inconsistencias)
-- ✅ Mapas de sectores (salud, educación, infraestructura)
-- ✅ Agente Validador (verifica URLs .gov.co)
-- ✅ Verificación de accesibilidad (HEAD requests)
-- ⚠️ **Falta**: Integración completa en flujo end-to-end
+- ✅ Agente Contraste (4 reglas deterministicas de inconsistencias)
+- ✅ Mapas de sectores (salud, educación, infraestructura, etc.)
+- ✅ Agente Validador (verifica dominios `*.gov.co`)
+- ✅ Verificación de accesibilidad (HEAD requests, online)
+- ✅ Integración completa en el grafo (fan-in extraccion+rag → contraste)
 
 **Tests**:
-- ✅ `test_contraste.py` (15+ casos)
-- ✅ `test_validador.py` (15+ casos)
-- ⚠️ Falta: tests e2e integración
-
-**Bloqueos**:
-- Generador no está completamente listo
-- Tests e2e parciales
+- ✅ `test_contraste.py` (30+ casos)
+- ✅ `test_validador.py` (30+ casos)
+- ✅ `test_graph.py` (integración de contraste y validador)
 
 ---
 
-### 🔄 Sprint 5 - Generador + Producto Final (50% COMPLETO)
+### ✅ Sprint 5 - Generador + Producto Final (COMPLETO)
 
 **Objetivo**: Construir respuesta final y entregar sistema completo.
 
 **Entregables**:
-- ✅ Agente Generador (síntesis con citación)
-- ✅ Fallback determinista (sin LLM)
-- ✅ Interfaz Streamlit (app.py)
+- ✅ Agente Generador (síntesis con citación obligatoria)
+- ✅ Fallback determinista (sin LLM), camino LLM Anthropic/Ollama opt-in
+- ✅ Citación de URLs oficiales validadas + pasajes del plan
+- ✅ Interfaz Streamlit (`app.py`) con cadena de evidencia auditable
 - ✅ CLI mejorado (`python -m ate --resumen`)
-- ⚠️ **En Progreso**: Respuestas finales pulidas, tests e2e
 
 **Tests**:
-- ✅ `test_generador.py` (15+ casos)
-- 🔄 `test_e2e_sprint5.py` (en validación)
+- ✅ `test_generador.py` (incluye citación obligatoria)
+- ✅ `test_e2e_sprint5.py` (flujo completo, ausencia de datos, neutralidad)
 
-**Falta**:
-- ❌ Respuestas en formato único párrafo
-- ❌ Tests e2e completos
-- ❌ Streamlit con visualización mejorada
-- ❌ Demo pública lista
+**Nota**: La suite completa es de **236 casos**, todos offline y
+deterministas. Una API REST (FastAPI) queda como extensión opcional
+post-Sprint 5.
 
 ---
 
