@@ -72,10 +72,30 @@ def consulta_para_tool(
     if nombre_tool == "consultar_cne":
         return candidato.consulta_cne
     if nombre_tool == "buscar_noticias":
-        return candidato.consulta_noticias
+        return _consulta_noticias(pregunta, candidato)
     # Default: pregunta cruda. Aplica a tools desconocidas o al RAG
     # (que se invoca via agente dedicado, no aqui).
     return pregunta
+
+
+def _consulta_noticias(pregunta: str, candidato: Candidato) -> str:
+    """Construye la consulta de noticias preservando el TEMA de la pregunta.
+
+    A diferencia de SECOP/CNE (que indexan por nombre/partido), una busqueda
+    web rinde mejor con el tema concreto que pregunta el usuario (p.ej.
+    'polemica', 'escandalo', 'declaracion sobre X'). Por eso NO se reemplaza
+    la pregunta por 'nombre + partido' (eso borraba el tema y devolvia
+    noticias genericas). En su lugar se ancla el nombre del candidato y se
+    conserva la pregunta. Si la pregunta ya menciona al candidato por su
+    nombre corto, se usa tal cual para no duplicar.
+    """
+    tema = pregunta.strip().strip("¿?¡!").strip()
+    nombre = candidato.nombre_corto
+    if not tema:
+        return f"{nombre} {candidato.partido}".strip()
+    if nombre.lower() in tema.lower():
+        return tema
+    return f"{nombre} {tema}"
 
 
 def _invocar_tool(

@@ -34,95 +34,149 @@ logger = logging.getLogger(__name__)
 # Prompt de Generacion
 # ---------------------------------------------------------------------------
 
-_PROMPT_GENERADOR = """Eres el Agente de Transparencia Electoral (ATE), la máxima autoridad en auditoría ciudadana de candidatos presidenciales en Colombia. Tu misión es transformar datos técnicos en un análisis político y ciudadano lúcido, crítico y profundamente argumentado.
+_PROMPT_GENERADOR = """Eres el Agente de Transparencia Electoral (ATE). Tu único trabajo es REDACTAR, en lenguaje claro y neutral, lo que dice la EVIDENCIA que se te entrega. No eres un analista político ni un opinador: eres un presentador de datos verificables.
 
-PROHIBICIONES ABSOLUTAS:
-- NO respondas con listas, viñetas, secciones, títulos ni formatos de "ficha técnica".
-- NO uses saltos de línea ni párrafos múltiples. TODA la respuesta debe ser UN SOLO PÁRRAFO continuo.
-- NO digas "Aquí están los datos" o "Según la fuente X".
-- NO repitas los datos crudos sin analizarlos.
-- NO incluyas fragmentos de código, JSONs, ni estructuras de datos técnicas.
+REGLAS INVIOLABLES (su incumplimiento invalida la respuesta):
+1. SOLO puedes afirmar hechos que estén EXPLÍCITAMENTE en la sección EVIDENCIA. Está terminantemente PROHIBIDO inventar o inferir cifras, montos, donantes, contratos, sanciones, propuestas o relaciones que no aparezcan literalmente en la evidencia.
+2. Si la evidencia NO contiene el dato que pide la pregunta (por ejemplo, montos o donantes de financiación), DEBES decirlo de forma explícita, indicando qué fuente se consultó y que no reportó datos. NUNCA rellenes el vacío con suposiciones.
+3. NEUTRALIDAD ABSOLUTA: prohibido emitir juicios de valor o adjetivos calificativos (p. ej. "alarmante", "preocupante", "contradictorio", "grave", "sospechoso", "bueno", "malo"). No insinúes irregularidades. Limítate a describir.
+4. Responde DIRECTAMENTE la pregunta del usuario, usando la evidencia más pertinente a esa pregunta. No la desvíes hacia otros temas que la evidencia no respalda.
+5. CITA solo fuentes que aparezcan en la EVIDENCIA. Integra las citas en el texto, p. ej. "[CNE Cuentas Claras]", "[SECOP]" o "[Plan de Gobierno, pág 3]". No cites fuentes que no estén listadas.
+6. Las "observaciones de contraste" son heurísticas automáticas, NO pruebas de irregularidad: si las mencionas, hazlo de forma descriptiva y neutral, aclarando que son comparaciones automáticas.
+7. Para preguntas de NOTICIAS o POLÉMICAS: resume únicamente los titulares realmente encontrados en los resultados de prensa y cita el enlace/medio de cada uno. Aclara que provienen de medios de comunicación, no de fuentes gubernamentales. Si la búsqueda de noticias no estaba configurada o no devolvió resultados, dilo explícitamente y NO inventes polémicas.
 
-ESTILO DE REDACCIÓN REQUERIDO:
-Toda la respuesta debe ser un único párrafo fluido y cohesionado, de no más de 120 palabras. Comienza con una conclusión directa y potente que responda a la pregunta del usuario, y luego desarrolla el argumento integrando la evidencia, el contraste y las validaciones mediante conectores narrativos (como "No obstante", "Esto contrasta con", "En consecuencia"). Las citas deben estar integradas naturalmente en el texto, por ejemplo: "[Plan de Gobierno, pág 12]" o "[datos.gov.co]".
+FORMATO:
+- Texto corrido, claro y conciso (1 a 3 oraciones por punto, sin viñetas ni JSON).
+- Empieza respondiendo la pregunta con lo que SÍ se sabe; si no se sabe, dilo primero.
 
-CONTEXTO PARA EL ANÁLISIS:
-- Pregunta del Usuario: {pregunta}
-- Candidato Analizado: {candidato}
-- Datos de Extracción: {contexto_extraido}
-- Propuestas del Plan (RAG): {contexto_rag}
-- Análisis de Contraste: {contexto_contraste}
-- Validación de Fuentes: {contexto_validacion}
+PREGUNTA DEL USUARIO: {pregunta}
+CANDIDATO: {candidato}
 
-INSTRUCCIÓN ADICIONAL: utiliza preferentemente los pasajes extraídos de los planes de gobierno oficiales cargados desde los PDFs de `public/Candidatos/`, y cita esas referencias cuando aporten evidencia directa.
+EVIDENCIA DISPONIBLE
+====================
+[Resultados de las fuentes consultadas — datos oficiales (*.gov.co) y prensa]
+{contexto_extraido}
+
+[Propuestas del plan de gobierno (RAG)]
+{contexto_rag}
+
+[Observaciones de contraste (heurísticas automáticas)]
+{contexto_contraste}
+
+[Validación de fuentes]
+{contexto_validacion}
+====================
+
+Redacta ahora la respuesta cumpliendo TODAS las reglas. Si la evidencia es insuficiente para responder la pregunta, dilo con claridad en lugar de especular.
 """
 
 # ---------------------------------------------------------------------------
 # FIX 1: _formatear_contexto — newlines reales en lugar de \\n escapados
 # ---------------------------------------------------------------------------
 
-def _formatear_contexto(estado: EstadoGrafo) -> dict:
-    """Convierte los objetos de estado en secciones de texto legibles para el prompt del LLM."""
+def _resumen_resultado(r) -> str:
+    """Resume una `ResultadoExtraccion` de forma fiel: fuente, estado y datos.
 
-    # 1. Extraccion
-    ext = estado.get("contexto_extraido")
-    txt_ext = "Sin datos de extraccion."
-    if ext:
-        res = []
-        for r in ext.resultados:
-            if r.estado in ("ok", "offline"):
-                res.append(
-                    _acortar_texto(
-                        f"Fuente {r.fuente} ({r.estado}): {r.resultados} | URLs: {r.urls_oficiales}",
-                        max_chars=240,
-                    )
-                )
-                if len(res) >= 2:
-                    break
-        if res:
-            txt_ext = "\n".join(res)
+    Declara explícitamente la ausencia de datos (estado != ok) para que el
+    LLM no rellene vacíos con invenciones. Solo muestra datos reales cuando
+    el estado es 'ok'.
+    """
+    encabezado = f"- {r.fuente} [estado: {r.estado}]"
+    if r.estado != "ok" or not r.resultados:
+        encabezado += f": {r.mensaje or 'sin datos reportados'}"
+        if r.urls_oficiales:
+            encabezado += f"  (fuente citable: {r.urls_oficiales[0]})"
+        return encabezado
 
+    # Noticias: listar los titulares reales (medio + enlace) para que el LLM
+    # los resuma y cite con precision, sin inventar.
+    if r.tool == "buscar_noticias":
+        lineas = []
+        for n in r.resultados[:6]:
+            if not isinstance(n, dict):
+                continue
+            titulo = (n.get("titulo") or "").strip()
+            medio = (n.get("fuente") or n.get("publicado") or "").strip()
+            url = (n.get("url") or "").strip()
+            etiqueta = f" ({medio})" if medio else ""
+            lineas.append(_acortar_texto(f"  · {titulo}{etiqueta} {url}", 260))
+        return encabezado + f": {r.total_resultados} noticia(s):\n" + "\n".join(lineas)
 
-    # 2. RAG
-    rag = estado.get("contexto_rag")
-    txt_rag = "Sin pasajes de planes de gobierno."
-    if rag and rag.hubo_pasajes:
-        res = []
-        for p in rag.pasajes[:2]:
-            res.append(
-                _acortar_texto(
-                    f"Pag {p.pagina} ({p.candidato_nombre}): {p.texto}",
-                    max_chars=260,
-                )
-            )
-        txt_rag = "\n".join(res)
-
-
-    # 3. Contraste
-    con = estado.get("contraste")
-    txt_con = "Sin analisis de contraste."
-    if con and con.estado == "ok":
-        if con.hubo_inconsistencias:
-            res = []
-            for i in con.inconsistencias[:3]:
-                res.append(
-                    _acortar_texto(
-                        f"{i.tipo}: {i.descripcion} | Evidencia: {i.evidencia_dato}",
-                        max_chars=240,
-                    )
-                )
-            txt_con = "\n".join(res)
-
+    # Datos estructurados (SECOP, CNE, sanciones): muestra hasta 2 filas.
+    filas = []
+    for fila in r.resultados[:2]:
+        if isinstance(fila, dict):
+            campos = [
+                f"{k}={v}"
+                for k, v in fila.items()
+                if v not in (None, "", [], {}) and k.lower() not in ("id", "uuid", "id_dataset")
+            ][:5]
+            filas.append("; ".join(campos))
         else:
-            txt_con = "No se detectaron inconsistencias entre propuestas y datos reales."
+            filas.append(str(fila))
+    detalle = " || ".join(_acortar_texto(f, 220) for f in filas if f)
+    encabezado += f": {r.total_resultados} resultado(s). {detalle}"
+    if r.urls_oficiales:
+        encabezado += f"  (fuente citable: {r.urls_oficiales[0]})"
+    return encabezado
 
-    # 4. Validacion
+
+def _formatear_contexto(estado: EstadoGrafo) -> dict:
+    """Serializa el estado del grafo en evidencia fiel y completa para el LLM.
+
+    Principios:
+        - Incluye TODAS las fuentes con su estado (la ausencia es explícita).
+        - Nunca omite una fuente solo porque no trajo datos: declararlo es
+          parte de la respuesta honesta.
+        - Presenta el contraste como observaciones automáticas neutrales.
+    """
+    # 1. Extracción: todas las fuentes, con su estado.
+    ext = estado.get("contexto_extraido")
+    if ext and ext.resultados:
+        txt_ext = "\n".join(_resumen_resultado(r) for r in ext.resultados)
+    else:
+        txt_ext = "No se consultaron fuentes oficiales para esta pregunta."
+
+    # 2. RAG: pasajes reales o ausencia explícita.
+    rag = estado.get("contexto_rag")
+    if rag and rag.pasajes:
+        txt_rag = "\n".join(
+            _acortar_texto(f"- pág {p.pagina} ({p.candidato_nombre}): {p.texto}", 260)
+            for p in rag.pasajes[:3]
+        )
+    elif rag is not None:
+        txt_rag = f"Sin pasajes del plan de gobierno (estado: {rag.estado})."
+    else:
+        txt_rag = "No se consultó el plan de gobierno."
+
+    # 3. Contraste: observaciones automáticas neutrales o ausencia.
+    con = estado.get("contraste")
+    if con is None:
+        txt_con = "No disponible."
+    elif con.estado == "sin_candidato":
+        txt_con = "No se identificó un candidato específico; no se realizó contraste."
+    elif con.estado == "sin_datos":
+        txt_con = f"Datos insuficientes para contrastar ({con.mensaje})."
+    elif con.estado == "ok" and con.inconsistencias:
+        items = "\n".join(f"- {i.descripcion}" for i in con.inconsistencias[:4])
+        txt_con = (
+            "Comparaciones automáticas (heurísticas, NO prueba de irregularidad):\n" + items
+        )
+    elif con.estado == "ok":
+        txt_con = "No se hallaron discrepancias entre las propuestas y los datos reales."
+    else:
+        txt_con = con.mensaje or "No disponible."
+
+    # 4. Validación: cuántas fuentes oficiales y sus URLs citables.
     val = estado.get("validacion")
-    txt_val = "Sin validacion de fuentes."
-    if val and val.estado == "ok":
-        txt_val = f"Fuentes validadas: {val.fuentes_oficiales} oficiales, {val.fuentes_no_oficiales} no oficiales."
+    if val and val.fuentes_validadas:
+        oficiales = [f.url for f in val.fuentes_validadas if f.es_oficial]
+        txt_val = f"{val.fuentes_oficiales} fuente(s) oficial(es) validada(s), {val.fuentes_no_oficiales} no oficial(es)."
+        if oficiales:
+            txt_val += " URLs oficiales citables: " + ", ".join(oficiales[:5])
+    else:
+        txt_val = "Sin fuentes web para validar."
 
-    # FIX: retornamos un dict con cada sección separada para pasarlas al prompt individualmente
     return {
         "extraido": txt_ext,
         "rag": txt_rag,
@@ -386,11 +440,12 @@ def _invocar_llm_anthropic(pregunta: str, candidato: str, secciones: dict, setti
     from langchain_anthropic import ChatAnthropic
     from langchain_core.messages import SystemMessage, HumanMessage
 
-    # FIX 3: temperatura 0.4 para respuestas más argumentadas y fluidas
+    # Temperatura 0: la fidelidad a la evidencia importa más que la fluidez.
+    # Reduce drasticamente la invención de datos no presentes en el contexto.
     llm = ChatAnthropic(
         model=settings.anthropic_model,
         api_key=settings.anthropic_api_key,
-        temperature=0.4,
+        temperature=0,
     )
 
     # FIX 2: se pasan las secciones reales al prompt en lugar de placeholders
@@ -437,7 +492,7 @@ def _invocar_llm_ollama(pregunta: str, candidato: str, secciones: dict, settings
         "prompt": prompt,
         "stream": False,
         "think": False,
-        "options": {"temperature": 0.4, "max_output_tokens": 128},
+        "options": {"temperature": 0, "max_output_tokens": 320},
     }
 
     url = f"{settings.ollama_host}/api/generate"

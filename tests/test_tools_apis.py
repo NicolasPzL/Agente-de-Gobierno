@@ -277,7 +277,9 @@ def test_noticias_tavily_ok(monkeypatch):
     def fake_post(url, *, settings, json_body, headers=None, timeout=None):  # noqa: ARG001
         assert url == "https://api.tavily.com/search"
         assert json_body["api_key"] == "t-key"
-        assert "Colombia elecciones 2026" in json_body["query"]
+        # Ancla el pais (Colombia) y preserva el tema/consulta del usuario.
+        assert "Colombia" in json_body["query"]
+        assert "Petro entrevista" in json_body["query"]
         return payload
 
     monkeypatch.setattr("ate.tools.busqueda_noticias.http_post_json", fake_post)

@@ -255,7 +255,7 @@ Ivan Cepeda?" (filtra a Cepeda) de "¿que candidato propone X tema?"
 | `consultar_secop` | pregunta cruda | `Ivan Cepeda Castro` |
 | `consultar_datos_abiertos` | pregunta cruda | `Ivan Cepeda Castro` |
 | `consultar_cne` | pregunta cruda | `Pacto Historico` |
-| `buscar_noticias` | pregunta cruda | `Ivan Cepeda Pacto Historico` |
+| `buscar_noticias` | pregunta cruda | `Ivan Cepeda` + tema de la pregunta (p.ej. `Ivan Cepeda que polemicas tiene`) |
 | `buscar_plan_gobierno` | (delegado al agente RAG) | (delegado al agente RAG) |
 
 La tool `buscar_plan_gobierno` esta en `_TOOLS_DELEGADAS` del

@@ -64,7 +64,9 @@ def _normalizar_resultados_serper(payload: Dict[str, Any]) -> List[Dict[str, Any
 def _consultar_tavily(consulta: str, cfg: Settings) -> ResultadoExtraccion:
     body = {
         "api_key": cfg.tavily_api_key,
-        "query": f"{consulta} (Colombia elecciones 2026)",
+        # Solo se ancla el pais (Colombia) para no sobre-restringir el recall.
+        # El tema (polemica, declaracion, etc.) ya viene en `consulta`.
+        "query": f"{consulta} Colombia",
         "search_depth": "basic",
         "topic": "news",
         "max_results": min(cfg.http_max_resultados, 10),
@@ -107,7 +109,9 @@ def _consultar_tavily(consulta: str, cfg: Settings) -> ResultadoExtraccion:
 
 def _consultar_serper(consulta: str, cfg: Settings) -> ResultadoExtraccion:
     body = {
-        "q": f"{consulta} Colombia elecciones 2026",
+        # gl=co + hl=es ya fijan el contexto colombiano; no sobre-restringimos
+        # con "elecciones 2026" para no perder recall en polemicas/declaraciones.
+        "q": f"{consulta} Colombia",
         "gl": "co",
         "hl": "es",
         "num": min(cfg.http_max_resultados, 10),

@@ -18,6 +18,50 @@ from ate.config.settings import Settings, load_settings
 from ate.schemas.state import Intencion
 
 
+@pytest.mark.parametrize(
+    "pregunta",
+    [
+        "¿De que origen proviene y cuanta plata tiene Cepeda para su campana?",
+        "cuanto dinero tiene la campana de Fajardo",
+        "quienes son los donantes de la campana",
+        "de donde salen los fondos de Claudia Lopez",
+        "como se financia Paloma Valencia",
+        "patrimonio declarado del candidato",
+    ],
+)
+def test_financiacion_reconoce_lenguaje_coloquial(pregunta):
+    """Preguntas de financiación en lenguaje natural deben ser FINANCIACION,
+    no INDEFINIDA (regresion: 'plata/dinero/fondos/financ' no se reconocian)."""
+    intencion, _ = clasificar_por_palabras(pregunta)
+    assert intencion is Intencion.FINANCIACION
+
+
+def test_propuesta_en_campana_sigue_siendo_plan_gobierno():
+    """'campana' es ambiguo: una pregunta sobre propuestas NO debe caer en
+    FINANCIACION solo por mencionar la campana."""
+    intencion, _ = clasificar_por_palabras("que propone en su campana sobre salud")
+    assert intencion is Intencion.PLAN_GOBIERNO
+
+
+@pytest.mark.parametrize(
+    "pregunta",
+    [
+        "¿que polemicas tiene Cepeda?",
+        "escandalos recientes del candidato",
+        "controversias de Fajardo",
+        "ultima declaracion de Petro",
+        "que noticias hay de Claudia Lopez",
+        "denuncias contra el candidato",
+        "que dijo el candidato esta semana",
+    ],
+)
+def test_noticias_y_polemicas_se_clasifican_como_noticias(pregunta):
+    """Regresion: las keywords de NOTICIAS tenian typos ('declcion',
+    'declaracioaranes') y faltaban polemica/escandalo/controversia/denuncia."""
+    intencion, _ = clasificar_por_palabras(pregunta)
+    assert intencion is Intencion.NOTICIAS
+
+
 def _settings_sin_llm() -> Settings:
     """Settings que fuerza el camino determinista (no toca red).
 

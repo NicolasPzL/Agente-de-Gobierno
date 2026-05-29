@@ -24,9 +24,20 @@ def test_con_candidato_cne_recibe_partido():
     assert consulta_para_tool("X", cep, "consultar_cne") == "Pacto Historico"
 
 
-def test_con_candidato_noticias_recibe_nombre_y_partido():
+def test_noticias_preserva_tema_y_ancla_nombre():
+    """La consulta de noticias debe conservar el TEMA de la pregunta (p.ej.
+    'polemicas') y anclar el nombre del candidato. Regresion: antes se
+    reemplazaba por 'nombre + partido', borrando el tema."""
     cep = por_id("ivan-cepeda")
-    assert consulta_para_tool("X", cep, "buscar_noticias") == "Ivan Cepeda Pacto Historico"
+    q = consulta_para_tool("¿que polemicas tiene?", cep, "buscar_noticias")
+    assert "Ivan Cepeda" in q
+    assert "polemicas" in q
+
+
+def test_noticias_no_duplica_nombre_si_ya_aparece():
+    cep = por_id("ivan-cepeda")
+    q = consulta_para_tool("noticias de Ivan Cepeda sobre la paz", cep, "buscar_noticias")
+    assert q == "noticias de Ivan Cepeda sobre la paz"
 
 
 def test_con_candidato_datos_oficiales_recibe_canonico():
