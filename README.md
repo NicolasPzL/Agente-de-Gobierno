@@ -85,3 +85,6 @@ El sistema opera como un grafo de decisión cíclico coordinado por **LangGraph*
 **Control de Alucinaciones:** Se implementará un paso de validación donde el LLM debe confirmar que el link de la fuente es funcional y oficial antes de entregar la respuesta al usuario.
 
 **Declaración de Ausencia:** Si el dato no existe en las fuentes oficiales consultadas, el agente debe declarar explícitamente que no tiene la información en lugar de intentar deducirla.
+---
+### Para mas información ingrese acá:
+[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/NicolasPzL/Agente-de-Gobierno)
